@@ -10,7 +10,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, sticker
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 questions = ['Question 1', 'Question 2', 'Question 3', 'Question 4', 'Question 5']
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +42,13 @@ async def edit_question(call: CallbackQuery, state: FSMContext):
 async def commit_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
     question_n = data['question_n']
+    if type(message.text) is not str:
+        await message.answer('Ай-ай-ай, какой-то неизвестный тип данных')
+        return None
     questions[int(question_n)] = message.text
+    for id in ADMINS:
+        await bot.send_message(id, f'Админы внимание! @{message.from_user.username} изменил вопрос {int(question_n) + 1} на {message.text}')
+
     await message.answer('Успешно')
     await state.clear()
 @dp.message(Command("start"))
