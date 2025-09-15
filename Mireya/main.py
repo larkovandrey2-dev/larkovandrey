@@ -1,5 +1,9 @@
 import time
 
+
+
+#методы с БД, запросы на нейронку
+
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, HTMLResponse
 from scripts import get_users_id
