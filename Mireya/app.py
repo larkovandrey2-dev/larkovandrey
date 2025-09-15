@@ -1,7 +1,10 @@
 import asyncio
 import logging
+from email import message
+
 import requests
 import datetime
+import kbs.inline as inline
 from CONFIG import ADMINS
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
@@ -18,15 +21,30 @@ bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
 dp = Dispatcher()
 class Questions(StatesGroup):
     question = State()
-
+class Admins(StatesGroup):
+    edit_question = State()
 
 @dp.message(Command('admin'))
 async def admin_command(message: types.Message):
     if message.from_user.id in ADMINS:
         await message.answer('Можете менять вопросики')
         text = 'Текущие вопросы:' + ' '.join(i for i in questions)
-        builder = await
+        builder = await inline.create_edit_questions_kb(questions)
+        await message.answer(text, reply_markup=builder.as_markup())
 
+@dp.callback_query(F.data.startswith('question_'))
+async def edit_question(call: CallbackQuery, state: FSMContext):
+    await call.message.answer('Напиши новый текст для вопроса')
+    data = call.data.split('_')
+    await state.set_state(Admins.edit_question)
+    await state.update_data(question_n = data[1])
+@dp.message(Admins.edit_question)
+async def commit_question(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    question_n = data['question_n']
+    questions[int(question_n)] = message.text
+    await message.answer('Успешно')
+    await state.clear()
 @dp.message(Command("start"))
 async def start(message: types.Message):
     req = requests.get(f"http://127.0.0.1:8000/api/register_user/{message.from_user.id}")
