@@ -2,6 +2,7 @@ import asyncio
 import logging
 import requests
 import datetime
+from CONFIG import ADMINS
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
@@ -17,15 +18,27 @@ bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
 dp = Dispatcher()
 class Questions(StatesGroup):
     question = State()
+
+
+@dp.message(Command('admin'))
+async def admin_command(message: types.Message):
+    if message.from_user.id in ADMINS:
+        await message.answer('Можете менять вопросики')
+        text = 'Текущие вопросы:' + ' '.join(i for i in questions)
+        builder = await
+
 @dp.message(Command("start"))
 async def start(message: types.Message):
     req = requests.get(f"http://127.0.0.1:8000/api/register_user/{message.from_user.id}")
     keyboard = InlineKeyboardBuilder()
     keyboard.row(types.InlineKeyboardButton(text='Пройти опрос',callback_data='start_test'))
     username = message.from_user.username
-    print(message.from_user.id)
-    text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
-    await message.answer(text,reply_markup=keyboard.as_markup())
+    if message.from_user.id not in ADMINS:
+        text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
+        await message.answer(text,reply_markup=keyboard.as_markup())
+    if message.from_user.id in ADMINS:
+        text = f'''Hello admins :-'''
+        await message.answer(text,reply_markup=keyboard.as_markup())
 
 
 async def ask_question(message: types.Message,state: FSMContext):
