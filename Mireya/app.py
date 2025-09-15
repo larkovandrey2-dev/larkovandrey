@@ -11,6 +11,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 questions = ['Question 1', 'Question 2', 'Question 3', 'Question 4', 'Question 5']
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
+
+#Админка - добавлять вопросы,редактировать вопросы,мониторить выходные данные
+
 dp = Dispatcher()
 class Questions(StatesGroup):
     question = State()
@@ -20,6 +23,7 @@ async def start(message: types.Message):
     keyboard = InlineKeyboardBuilder()
     keyboard.row(types.InlineKeyboardButton(text='Пройти опрос',callback_data='start_test'))
     username = message.from_user.username
+    print(message.from_user.id)
     text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
     await message.answer(text,reply_markup=keyboard.as_markup())
 
