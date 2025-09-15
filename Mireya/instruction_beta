@@ -1,0 +1,4 @@
+код на бота в файле app.py
+код на апи в файле main.py
+запустить fastapi сервер - uvicorn main:app --reload
+libs: aiogram,requests,fastpi,asyncio
