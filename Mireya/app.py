@@ -23,21 +23,36 @@ class Questions(StatesGroup):
     question = State()
 class Admins(StatesGroup):
     edit_question = State()
-
+    new_question = State()
 @dp.message(Command('admin'))
 async def admin_command(message: types.Message):
     if message.from_user.id in ADMINS:
         await message.answer('Можете менять вопросики')
-        text = 'Текущие вопросы:' + ' '.join(i for i in questions)
+        text = 'Текущие вопросы:\n'
+        for i in questions:
+            text += f'\n{questions.index(i)+1}. {i}'
         builder = await inline.create_edit_questions_kb(questions)
         await message.answer(text, reply_markup=builder.as_markup())
 
 @dp.callback_query(F.data.startswith('question_'))
 async def edit_question(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Напиши новый текст для вопроса')
     data = call.data.split('_')
-    await state.set_state(Admins.edit_question)
-    await state.update_data(question_n = data[1])
+    if data[1] != 'create':
+        await call.message.answer('Напиши новый текст для вопроса')
+        await state.set_state(Admins.edit_question)
+        await state.update_data(question_n = data[1])
+    else:
+        await call.message.answer('Напиши текст для нового вопроса')
+        await state.set_state(Admins.new_question)
+
+
+@dp.message(Admins.new_question)
+async def new_question(message: types.Message, state: FSMContext):
+    if type(message.text) == str:
+        await message.answer('Вопрос успешно добавлен')
+        questions.append(message.text)
+        await state.clear()
+        await admin_command(message)
 @dp.message(Admins.edit_question)
 async def commit_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
