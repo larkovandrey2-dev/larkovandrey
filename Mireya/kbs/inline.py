@@ -6,4 +6,5 @@ async def create_edit_questions_kb(questions):
     builder = InlineKeyboardBuilder()
     for i in questions:
         builder.row(InlineKeyboardButton(text=i, callback_data=f'question_{questions.index(i)}'))
+    builder.row(InlineKeyboardButton(text='Добавить новый вопрос',callback_data='question_create'))
     return builder
