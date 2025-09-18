@@ -49,11 +49,11 @@ async def commit_question(message: types.Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith('personal_lk'))
 async def personal_lk(call: CallbackQuery, state: FSMContext):
-    data = requests.get(f"http://127.0.0.1:8000/api/get_user/{call.message.from_user.id}").json()
-    print(data)
-    text = f'''Ваш username: @{call.message.from_user.username}
+    req = f"http://127.0.0.1:8000/api/get_user/{call.from_user.id}"
+    data = requests.get(req).json()
+    text = f'''Ваш username: @{call.from_user.username}
 Ваш ID: {call.message.from_user.id}
-Количество пройденных опросов: {data['surveys_count']}'''
+Количество пройденных опросов: {data['surveys_count']}\n'''
     if data['role'] == 'user':
         text += 'Ваша роль: пользователь'
     elif data['role'] == 'admin':

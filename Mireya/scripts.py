@@ -25,7 +25,7 @@ def create_user(id, role = "user", refer_id = 0):
             print("User added")
 
 def get_user_stats(id) -> dict:
-    if id not in all_users():
+    if int(id) not in all_users():
         print("No such user")
         return {}
     response = supabase.table("users").select("role, refer_id, surveys_count").eq("user_id", id).execute()
