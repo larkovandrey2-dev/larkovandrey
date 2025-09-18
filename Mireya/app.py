@@ -46,11 +46,27 @@ async def commit_question(message: types.Message, state: FSMContext):
     questions[int(question_n)] = message.text
     await message.answer('Успешно')
     await state.clear()
+
+@dp.callback_query(F.data.startswith('personal_lk'))
+async def personal_lk(call: CallbackQuery, state: FSMContext):
+    data = requests.get(f"http://127.0.0.1:8000/api/get_user/{call.message.from_user.id}").json()
+    print(data)
+    text = f'''Ваш username: @{call.message.from_user.username}
+Ваш ID: {call.message.from_user.id}
+Количество пройденных опросов: {data['surveys_count']}'''
+    if data['role'] == 'user':
+        text += 'Ваша роль: пользователь'
+    elif data['role'] == 'admin':
+        text += 'Ваша роль: администратор'
+    elif data['role'] == 'psychologist':
+        text += 'Ваша роль: психолог'
+    await call.message.answer(text)
 @dp.message(Command("start"))
 async def start(message: types.Message):
     req = requests.get(f"http://127.0.0.1:8000/api/register_user/{message.from_user.id}")
     keyboard = InlineKeyboardBuilder()
     keyboard.row(types.InlineKeyboardButton(text='Пройти опрос',callback_data='start_test'))
+    keyboard.row(types.InlineKeyboardButton(text='Личный кабинет',callback_data='personal_lk'))
     username = message.from_user.username
     if message.from_user.id not in ADMINS:
         text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''

@@ -36,5 +36,3 @@ def get_user_stats(id):
         surveys_count = surveys_count_reponse.data[0]['surveys_count']
     res = {"role": role, "refer_id": refer_id, "surveys_count": surveys_count}
     return res
-
-print(get_user_stats(740740154))
