@@ -38,7 +38,7 @@ def add_answer(id,question_n,text,date):
         "user_id": id,
         "question_index": question_n,
         "response_text": str(text),
-        "response_date": date.today().isoformat()
+        "response_date": str(date)
     }
     response = supabase.table("user_responses").insert(new_question_response).execute()
     for person in people:

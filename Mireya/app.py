@@ -78,7 +78,7 @@ async def message_test(message: types.Message,state: FSMContext):
     text = message.text
     data = await state.get_data()
     question_n = data['question_n']
-    req = requests.get(f"http://127.0.0.1:8000/api/add_answer/{message.from_user.id}/{question_n}&{text}&{datetime.datetime.now()}")
+    requests.get(f"http://127.0.0.1:8000/api/add_answer/{message.from_user.id}/{question_n}&{text}&{datetime.datetime.now()}")
     question_n += 1
     if question_n == len(questions)+1:
         await finish_test(message,state)
