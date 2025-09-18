@@ -13,7 +13,7 @@ from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from supabase import create_client, Client
 from datetime import date
-questions = ['Question 1', 'Question 2', 'Question 3', 'Question 4', 'Question 5']
+questions = ['Как ты чувствуешь себя после учебы?', 'Как ты чувствуешь себя при общении с однокурсниками? Появились ли у тебя друзья?', 'Тяжело ли тебе однозначно принимать решения?']
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
 
@@ -24,7 +24,7 @@ class Questions(StatesGroup):
     question = State()
 class Admins(StatesGroup):
     edit_question = State()
-
+    new_question = State()
 @dp.message(Command('admin'))
 async def admin_command(message: types.Message):
     if message.from_user.id in ADMINS:
@@ -35,10 +35,23 @@ async def admin_command(message: types.Message):
 
 @dp.callback_query(F.data.startswith('question_'))
 async def edit_question(call: CallbackQuery, state: FSMContext):
-    await call.message.answer('Напиши новый текст для вопроса')
     data = call.data.split('_')
-    await state.set_state(Admins.edit_question)
-    await state.update_data(question_n = data[1])
+    if data[1] != 'create':
+        await call.message.answer('Напиши новый текст для вопроса')
+        await state.set_state(Admins.edit_question)
+        await state.update_data(question_n = data[1])
+    else:
+        await call.message.answer('Напиши текст для нового вопроса')
+        await state.set_state(Admins.new_question)
+
+
+@dp.message(Admins.new_question)
+async def new_question(message: types.Message, state: FSMContext):
+    if type(message.text) == str:
+        await message.answer('Вопрос успешно добавлен')
+        questions.append(message.text)
+        await state.clear()
+        await admin_command(message)
 @dp.message(Admins.edit_question)
 async def commit_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -82,10 +95,10 @@ async def ask_question(message: types.Message,state: FSMContext):
     await message.answer(questions[question_n-1])
 async def finish_test(message: types.Message,state: FSMContext):
     await state.clear()
-    await message.answer('Test is over')
+    await message.answer('Опрос заверешен')
 @dp.callback_query(F.data.startswith("start_test"))
 async def start_test(call: CallbackQuery,state: FSMContext):
-    await call.message.delete()
+
     await bot.send_message(call.message.chat.id,questions[0])
     await state.set_state(Questions.question)
     await state.update_data(question_n=1)
