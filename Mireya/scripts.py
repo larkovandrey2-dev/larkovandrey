@@ -11,7 +11,7 @@ def all_users() -> list:
     users = [item['user_id'] for item in response.data]
     return users
 
-def create_user(id, role, refer_id):
+def create_user(id, role = "user", refer_id = 0):
     if id in all_users():
         print("User already exists")
     else:
@@ -23,3 +23,18 @@ def create_user(id, role, refer_id):
         response = supabase.table('users').insert(new_user).execute()
         if response:
             print("User added")
+
+def get_user_stats(id):
+    if id not in all_users():
+        print("No such user")
+    else:
+        role_response = supabase.table('users').select('role').eq('user_id',id).execute()
+        role = role_response.data[0]['role']
+        refer_id_response = supabase.table('users').select('refer_id').eq('user_id',id).execute()
+        refer_id = refer_id_response.data[0]['refer_id']
+        surveys_count_reponse = supabase.table('users').select('surveys_count').eq('user_id',id).execute()
+        surveys_count = surveys_count_reponse.data[0]['surveys_count']
+    res = {"role": role, "refer_id": refer_id, "surveys_count": surveys_count}
+    return res
+
+print(get_user_stats(740740154))
