@@ -7,8 +7,8 @@ SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmF
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 def all_users() -> list:
-    response = supabase.table('users').select('user_id').execute()
-    users = [item['user_id'] for item in response.data]
+    response = supabase.table("users").select("user_id").execute()
+    users = [item["user_id"] for item in response.data]
     return users
 
 def create_user(id, role = "user", refer_id = 0):
@@ -24,15 +24,10 @@ def create_user(id, role = "user", refer_id = 0):
         if response:
             print("User added")
 
-def get_user_stats(id):
+def get_user_stats(id) -> dict:
     if id not in all_users():
         print("No such user")
-    else:
-        role_response = supabase.table('users').select('role').eq('user_id',id).execute()
-        role = role_response.data[0]['role']
-        refer_id_response = supabase.table('users').select('refer_id').eq('user_id',id).execute()
-        refer_id = refer_id_response.data[0]['refer_id']
-        surveys_count_reponse = supabase.table('users').select('surveys_count').eq('user_id',id).execute()
-        surveys_count = surveys_count_reponse.data[0]['surveys_count']
-    res = {"role": role, "refer_id": refer_id, "surveys_count": surveys_count}
-    return res
+        return {}
+    response = supabase.table("users").select("role, refer_id, surveys_count").eq("user_id", id).execute()
+    user_data = response.data[0]
+    return user_data
