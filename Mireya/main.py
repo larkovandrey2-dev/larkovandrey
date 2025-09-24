@@ -2,8 +2,9 @@ import time
 #методы с БД, запросы на нейронку
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, HTMLResponse
-from Mireya.database_scripts import get_users_id, add_gad7_answer
+from database_scripts import get_users_id, all_users,create_user, get_user_stats, add_gad7_answer
 from supabase import create_client, Client
+import CONFIG
 import os
 from dotenv import load_dotenv
 # initialize database
@@ -12,13 +13,7 @@ SUPABASE_URL = supabase_url = os.getenv('SUPABASE_URL')
 SUPABASE_KEY  = supabase_url = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = supabase_url = os.getenv('SUPABASE_SERVICE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-people = []
 app = FastAPI()
-class User():
-    def __init__(self, id, data=None):
-        self.id = id
-        self.data = []
 @app.get("/")
 def root():
     html_content = "<h2>Hello Mireya<h2>"
@@ -26,26 +21,31 @@ def root():
 
 @app.get("/api/register_user/{id}")
 def register_user(id):
-    if id not in get_users_id(people):
-        people.append(User(id))
-    return people
+    if int(id) not in all_users():
+        if int(id) in CONFIG.ADMINS:
+            create_user(id, 'admin',0)
+        else:
+            create_user(id, 'user',0)
+
 @app.get("/api/add_answer/{id}/{question_n}&{text}&{date}")
 def add_answer(id,questionnaire_n, question_n,text,date):
     add_gad7_answer(id,questionnaire_n,question_n,text,date)
-    for person in people:
+    '''for person in people:
         if person.id == id:
             person.data.append({'question_n': question_n, 'text': text, 'date': date})
             return person.data
-    return JSONResponse({"error": "No such user"})
+    return JSONResponse({"error": "No such user"})'''
+
 @app.get("/api/get_user/{id}")
 def get_user(id):
-    for i in people:
-        if i.id == id:
-            return {'id': i.id, 'data': i.data}
-    return JSONResponse({"error": "User not found"}, status_code=404)
+    try:
+        return get_user_stats(int(id))
+    except Exception as e:
+        print(e)
+        return JSONResponse({"error": "User not found"}, status_code=404)
 @app.get("/api/show_all_users")
 def show_all_users():
     res = []
-    for person in people:
-        res.append({'id': person.id, 'data': person.data})
+    for user in all_users():
+        res.append(get_user_stats(user))
     return res
