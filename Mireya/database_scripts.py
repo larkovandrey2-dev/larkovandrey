@@ -42,11 +42,10 @@ def get_user_stats(id: int) -> dict:
     except Exception as e:
         print(f"Error in get_user_stats: {e}")
 
-def add_gad7_answer(user_id: int, questionnaire_index: int, question_index: int, response_text: str, response_date: str):
+def add_gad7_answer(user_id: int, question_index: int, response_text: str, response_date: str):
     try:
         new_response = {
             "user_id": int(user_id),
-            "questionnaire_index": int(questionnaire_index),
             "question_index": int(question_index),
             "response_text": str(response_text),
             "response_date": str(response_date)

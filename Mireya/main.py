@@ -2,7 +2,7 @@ import time
 #методы с БД, запросы на нейронку
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, HTMLResponse
-from database_scripts import get_users_id, all_users,create_user, get_user_stats, add_gad7_answer
+from database_scripts import all_users,create_user, get_user_stats, add_gad7_answer
 from supabase import create_client, Client
 import CONFIG
 import os
@@ -28,13 +28,11 @@ def register_user(id):
             create_user(id, 'user',0)
 
 @app.get("/api/add_answer/{id}/{question_n}&{text}&{date}")
-def add_answer(id,questionnaire_n, question_n,text,date):
-    add_gad7_answer(id,questionnaire_n,question_n,text,date)
-    '''for person in people:
-        if person.id == id:
-            person.data.append({'question_n': question_n, 'text': text, 'date': date})
-            return person.data
-    return JSONResponse({"error": "No such user"})'''
+def add_answer(id, question_n,text,date):
+    try:
+        add_gad7_answer(id,question_n,text,date)
+    except Exception as e:
+        print(f"Error in add_answer: {e}")
 
 @app.get("/api/get_user/{id}")
 def get_user(id):
