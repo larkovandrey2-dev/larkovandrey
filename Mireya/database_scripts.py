@@ -14,16 +14,16 @@ def all_users() -> list:
     users = [item["user_id"] for item in response.data]
     return users
 
-def create_user(id :int, role = "user", refer_id = 0):
+def create_user(id :int, last_survey_index: int, role = "user", refer_id = 0):
     try:
         if id in all_users():
             print("User already exists")
         else:
             new_user = {
-                ##предыдущий номер опроса,который прошел, изначально -1 поставить можно
                 "user_id": id,
                 "role": role,
-                "refer_id":refer_id,
+                "refer_id": refer_id,
+                "last_survey_index": last_survey_index # default None
             }
             response = supabase.table('users').insert(new_user).execute()
             if response:
@@ -43,11 +43,11 @@ def get_user_stats(id: int) -> dict:
     except Exception as e:
         print(f"Error in get_user_stats: {e}")
 
-def add_gad7_answer(user_id: int, question_index: int, response_text: str, response_date: str):
+def add_gad7_answer(user_id: int, survey_index: int, question_index: int, response_text: str, response_date: str):
     try:
         new_response = {
             "user_id": int(user_id),
-            ###survey_number(int)
+            "survey_index": int(survey_index),
             "question_index": int(question_index),
             "response_text": str(response_text),
             "response_date": str(response_date)
@@ -55,4 +55,3 @@ def add_gad7_answer(user_id: int, question_index: int, response_text: str, respo
         response = supabase.table("user_gad7_responses").insert(new_response).execute()
     except Exception as e:
         print(f"Error in add_gad7_answer: {e}")
-
