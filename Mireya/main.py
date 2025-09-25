@@ -27,10 +27,10 @@ def register_user(id):
         else:
             create_user(id, 'user',0)
 
-@app.get("/api/add_answer/{id}/{question_n}&{text}&{date}")
-def add_answer(id, question_n,text,date):
+@app.get("/api/add_answer/{id}/{survey_n}&{question_n}&{text}&{date}")
+def add_answer(id, survey_n,question_n,text,date):
     try:
-        add_gad7_answer(id,question_n,text,date)
+        add_gad7_answer(id,survey_n,question_n,text,date)
     except Exception as e:
         print(f"Error in add_answer: {e}")
 

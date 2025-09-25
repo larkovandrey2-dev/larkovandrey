@@ -20,6 +20,7 @@ def create_user(id :int, role = "user", refer_id = 0):
             print("User already exists")
         else:
             new_user = {
+                ##предыдущий номер опроса,который прошел, изначально -1 поставить можно
                 "user_id": id,
                 "role": role,
                 "refer_id":refer_id,
@@ -46,6 +47,7 @@ def add_gad7_answer(user_id: int, question_index: int, response_text: str, respo
     try:
         new_response = {
             "user_id": int(user_id),
+            ###survey_number(int)
             "question_index": int(question_index),
             "response_text": str(response_text),
             "response_date": str(response_date)
