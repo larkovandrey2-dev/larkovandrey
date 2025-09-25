@@ -1,6 +1,10 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+async def create_admin_commands():
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text='Посмотреть список вопросов',callback_data='admin_show_questions'))
+    return builder
 
 
 async def create_edit_questions_kb(questions):

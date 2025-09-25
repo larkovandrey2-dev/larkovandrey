@@ -9,7 +9,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, sticker
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from supabase import create_client, Client
 from datetime import date
@@ -28,10 +28,20 @@ class Admins(StatesGroup):
 @dp.message(Command('admin'))
 async def admin_command(message: types.Message):
     if message.from_user.id in ADMINS:
-        await message.answer('Можете менять вопросики')
-        text = 'Текущие вопросы:' + ' '.join(i for i in questions)
+        builder = await inline.create_admin_commands()
+        await message.answer('Доступ разрешен. Выберите действие: ',reply_markup=builder.as_markup())
+    else:
+        await message.answer('Доступ запрещен.')
+
+@dp.callback_query(F.data.startswith('admin_show_questions'))
+async def admin_show_questions_actions(call: CallbackQuery):
+    if call.from_user.id in ADMINS:
+        await call.message.answer('Можете менять вопросики')
+        text = 'Текущие вопросы:\n'
+        for i in questions:
+            text += f'\n{questions.index(i)+1}. {i}'
         builder = await inline.create_edit_questions_kb(questions)
-        await message.answer(text, reply_markup=builder.as_markup())
+        await call.message.answer(text, reply_markup=builder.as_markup())
 
 @dp.callback_query(F.data.startswith('question_'))
 async def edit_question(call: CallbackQuery, state: FSMContext):
@@ -56,7 +66,13 @@ async def new_question(message: types.Message, state: FSMContext):
 async def commit_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
     question_n = data['question_n']
+    if type(message.text) is not str:
+        await message.answer('Ай-ай-ай, какой-то неизвестный тип данных')
+        return None
     questions[int(question_n)] = message.text
+    for id in ADMINS:
+        await bot.send_message(id, f'Админы внимание! @{message.from_user.username} изменил вопрос {int(question_n) + 1} на {message.text}')
+
     await message.answer('Успешно')
     await state.clear()
 
@@ -85,7 +101,7 @@ async def start(message: types.Message):
         text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
         await message.answer(text,reply_markup=keyboard.as_markup())
     if message.from_user.id in ADMINS:
-        text = f'''Hello admins :-'''
+        text = f'''Добро пожаловать, администратор (/admin)'''
         await message.answer(text,reply_markup=keyboard.as_markup())
 
 
