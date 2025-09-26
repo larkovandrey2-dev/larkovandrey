@@ -3,8 +3,9 @@ import logging
 from email import message
 import requests
 import datetime
+import os
+import database_scripts
 import kbs.inline as inline
-from CONFIG import ADMINS
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
@@ -13,7 +14,9 @@ from aiogram.types import CallbackQuery, sticker
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from supabase import create_client, Client
 from datetime import date
-questions = ['Как ты чувствуешь себя после учебы?', 'Как ты чувствуешь себя при общении с однокурсниками? Появились ли у тебя друзья?', 'Тяжело ли тебе однозначно принимать решения?']
+
+
+ADMINS = os.getenv("ADMINS")
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
 
@@ -21,13 +24,13 @@ bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
 
 dp = Dispatcher()
 class Questions(StatesGroup):
-    question = State()
+    questions = State()
 class Admins(StatesGroup):
     edit_question = State()
     new_question = State()
 @dp.message(Command('admin'))
 async def admin_command(message: types.Message):
-    if message.from_user.id in ADMINS:
+    if str(message.from_user.id) in ADMINS:
         builder = await inline.create_admin_commands()
         await message.answer('Доступ разрешен. Выберите действие: ',reply_markup=builder.as_markup())
     else:
@@ -35,7 +38,7 @@ async def admin_command(message: types.Message):
 
 @dp.callback_query(F.data.startswith('admin_show_questions'))
 async def admin_show_questions_actions(call: CallbackQuery):
-    if call.from_user.id in ADMINS:
+    if str(call.from_user.id) in ADMINS:
         await call.message.answer('Можете менять вопросики')
         text = 'Текущие вопросы:\n'
         for i in questions:
@@ -97,39 +100,48 @@ async def start(message: types.Message):
     keyboard.row(types.InlineKeyboardButton(text='Пройти опрос',callback_data='start_test'))
     keyboard.row(types.InlineKeyboardButton(text='Личный кабинет',callback_data='personal_lk'))
     username = message.from_user.username
-    if message.from_user.id not in ADMINS:
+    if str(message.from_user.id) not in ADMINS:
         text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
         await message.answer(text,reply_markup=keyboard.as_markup())
-    if message.from_user.id in ADMINS:
+    if str(message.from_user.id) in ADMINS:
         text = f'''Добро пожаловать, администратор (/admin)'''
         await message.answer(text,reply_markup=keyboard.as_markup())
 
 
 async def ask_question(message: types.Message,state: FSMContext):
     data = await state.get_data()
+    print(data)
     question_n = data['question_n']
-    await message.answer(questions[question_n-1])
+    question_list = data['question_list']
+    await message.answer(question_list[question_n])
 async def finish_test(message: types.Message,state: FSMContext):
     await state.clear()
     await message.answer('Опрос заверешен')
 @dp.callback_query(F.data.startswith("start_test"))
 async def start_test(call: CallbackQuery,state: FSMContext):
+    data = requests.get(f"http://127.0.0.1:8000/api/{call.from_user.id}/get_question_list").json()
+    questions = data['question_list']
+    await state.update_data(question_list=questions)
+    await state.update_data(question_n=0)
+    await state.set_state(Questions.questions)
+    await ask_question(call.message,state)
 
-    await bot.send_message(call.message.chat.id,questions[0])
-    await state.set_state(Questions.question)
-    await state.update_data(question_n=1)
-@dp.message(Questions.question)
+
+
+@dp.message(Questions.questions)
 async def message_test(message: types.Message,state: FSMContext):
     text = message.text
     data = await state.get_data()
     question_n = data['question_n']
+    question_list = data['question_list']
     requests.get(f"http://127.0.0.1:8000/api/add_answer/{message.from_user.id}/{question_n}&{text}&{datetime.datetime.now()}")
     question_n += 1
-    if question_n == len(questions)+1:
+    if question_n == len(question_list):
         await finish_test(message,state)
-        return None
     await state.update_data(question_n=question_n)
     await ask_question(message,state)
+
+
 async def main():
     await dp.start_polling(bot)
 
