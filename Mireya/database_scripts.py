@@ -13,7 +13,6 @@ def all_users() -> list:
     response = supabase.table("users").select("user_id").execute()
     users = [item["user_id"] for item in response.data]
     return users
-
 def create_user(id :int, last_survey_index: int, role = "user", refer_id = 0):
     try:
         if id in all_users():
