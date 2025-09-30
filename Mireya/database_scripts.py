@@ -1,4 +1,5 @@
 from supabase import create_client, Client
+import supabase
 from datetime import date
 import os
 from dotenv import load_dotenv
