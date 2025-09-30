@@ -104,7 +104,6 @@ def all_questions():
     except Exception as e:
         print(f"Error in all_questions: {e}")
 
-
 def add_question(question_index: int, survey_index: int, question_text: str):
     try:
         new_response = {
@@ -128,7 +127,13 @@ def change_question(question_index: int, survey_index: int, new_question_text: s
         response = supabase.table("all_questions").update(new_response).eq("question_index", question_index).eq("survey_index", survey_index).execute()
     except Exception as e:
         print(f"Error in change_question: {e}")
-
+def change_question_index(question_index: int, survey_index: int, new_question_index: int):
+    '''change question index by its question_index and survey_index'''
+    try:
+        new_response = {"question_index": new_question_index}
+        response = supabase.table('all_questions').update(new_response).eq("question_index", question_index).eq("survey_index", survey_index).execute()
+    except Exception as e:
+        print(f"Error in change_question_index: {e}")
 
 def delete_question(question_index: int, survey_index: int):
     '''delete question by its question_index and survey_index'''

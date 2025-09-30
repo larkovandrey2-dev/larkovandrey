@@ -2,6 +2,8 @@ import time
 #методы с БД, запросы на нейронку
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, HTMLResponse
+
+import database_scripts
 from database_scripts import all_users,create_user, get_user_stats, add_gad7_answer
 from supabase import create_client, Client
 import CONFIG
@@ -51,6 +53,12 @@ def show_all_users():
     for user in all_users():
         res.append(get_user_stats(user))
     return res
+@app.get("/api/add_question/{survey_n}&{question_n}&{text}")
+def add_question(survey_n,question_n,text):
+    database_scripts.add_question(survey_n,question_n,text)
+@app.get("/api/get_questions/{survey_id}")
+def get_question(survey_id):
+    return JSONResponse({'data': [i for i in database_scripts.all_questions() if i['survey_index'] == int(survey_id)]})
 @app.get("/api/{id}/get_question_list")
 def get_question_list(id):
     try:
