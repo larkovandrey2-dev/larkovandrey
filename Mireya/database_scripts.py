@@ -8,6 +8,7 @@ SUPABASE_KEY  = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 #Добавить функцию изменения статов пользователя, чтобы и последний номер опроса можно было менять и количество пройденных опросов
+#Добавить строки пол, возраст, образование в пользователи, таблица вопросов:текст вопроса, принадлежность к опросу(1,2,...). Метод изменения вопросов и их добавления
 def all_users() -> list:
     response = supabase.table("users").select("user_id").execute()
     users = [item["user_id"] for item in response.data]
