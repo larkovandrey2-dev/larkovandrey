@@ -2,13 +2,13 @@ from supabase import create_client, Client
 from datetime import date
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY  = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
+#Добавить функцию изменения статов пользователя, чтобы и последний номер опроса можно было менять и количество пройденных опросов
+#Добавить строки пол, возраст, образование в пользователи, таблица вопросов:текст вопроса, принадлежность к опросу(1,2,...). Метод изменения вопросов и их добавления
 def all_users() -> list:
     response = supabase.table("users").select("user_id").execute()
     users = [item["user_id"] for item in response.data]
@@ -36,7 +36,7 @@ def get_user_stats(id: int) -> dict:
         if id not in all_users():
             print("No such user, creating...")
             create_user(id)
-        response = supabase.table("users").select("role, refer_id, surveys_count").eq("user_id", id).execute()
+        response = supabase.table("users").select("role, refer_id, surveys_count, last_survey_index").eq("user_id", id).execute()
         user_data = response.data[0]
         return user_data
     except Exception as e:
