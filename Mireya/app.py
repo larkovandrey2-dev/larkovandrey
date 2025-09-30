@@ -1,6 +1,8 @@
 import asyncio
 import logging
 from email import message
+from sqlite3 import SQLITE_READ
+
 import requests
 import datetime
 import os
@@ -10,7 +12,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import CallbackQuery, sticker
+from aiogram.types import CallbackQuery, sticker, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from supabase import create_client, Client
 from datetime import date
@@ -23,6 +25,10 @@ bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
 #Админка - добавлять вопросы,редактировать вопросы,мониторить выходные данные
 
 dp = Dispatcher()
+class UserConfig(StatesGroup):
+    age = State()
+    sex = State()
+    education = State()
 class Questions(StatesGroup):
     questions = State()
 class Admins(StatesGroup):
@@ -94,7 +100,11 @@ async def personal_lk(call: CallbackQuery, state: FSMContext):
         text += 'Ваша роль: психолог'
     await call.message.answer(text)
 @dp.message(Command("start"))
-async def start(message: types.Message):
+async def start(message: types.Message,state: FSMContext):
+    users_id = database_scripts.all_users()
+    if str(message.from_user.id) not in 'aa':
+        await message.answer('Вы в нашем сервисе впервые. Введите свой возраст')
+        await state.set_state(UserConfig.age)
     req = requests.get(f"http://127.0.0.1:8000/api/register_user/{message.from_user.id}")
     keyboard = InlineKeyboardBuilder()
     keyboard.row(types.InlineKeyboardButton(text='Пройти опрос',callback_data='start_test'))
@@ -107,6 +117,28 @@ async def start(message: types.Message):
         text = f'''Добро пожаловать, администратор (/admin)'''
         await message.answer(text,reply_markup=keyboard.as_markup())
 
+@dp.message(UserConfig.age)
+async def age_setup(message: types.Message, state: FSMContext):
+    age = message.text
+    if not age.isdigit() or not (12 < int(age) < 100):
+        await message.answer('Введите корректный возраст')
+    else:
+        await state.update_data(age=age)
+        kb = ReplyKeyboardMarkup(resize_keyboard=True,keyboard=[[KeyboardButton(text='Мужской 👨')],[KeyboardButton(text='Женский 👩')]])
+        await message.answer('Выберите пол:',reply_markup=kb)
+        await state.set_state(UserConfig.sex)
+@dp.message(UserConfig.sex)
+async def sex_setup(message: types.Message, state: FSMContext):
+    sex = message.text.split()[0]
+    await state.update_data(sex=sex)
+    kb = ReplyKeyboardMarkup(resize_keyboard=True,keyboard=[[KeyboardButton(text='Высшее образование')],[KeyboardButton(text='Основное общее образование')],[KeyboardButton(text='Среднее общее')]])
+    await message.answer('Выберите уровень образования: ',reply_markup=kb)
+    await state.set_state(UserConfig.education)
+@dp.message(UserConfig.education)
+async def finish_setup(message: types.Message, state: FSMContext):
+    education = message.text
+    data = await state.get_data()
+    print(data,education)
 
 async def ask_question(message: types.Message,state: FSMContext):
     data = await state.get_data()
