@@ -6,6 +6,7 @@ from database_scripts import all_users,create_user, get_user_stats, add_gad7_ans
 from supabase import create_client, Client
 import CONFIG
 import os
+import random
 from dotenv import load_dotenv
 # initialize database
 load_dotenv()
@@ -14,6 +15,9 @@ SUPABASE_KEY  = supabase_url = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = supabase_url = os.getenv('SUPABASE_SERVICE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 app = FastAPI()
+surveys = {1:['Как ты чувствуешь себя после учебы?', 'Как ты чувствуешь себя при общении с однокурсниками? Появились ли у тебя друзья?', 'Тяжело ли тебе однозначно принимать решения?'],
+           2:['Опрос 2_1','Опрос 2_2'],
+           3:['Опрос 3_1','Опрос 3_2']}
 @app.get("/")
 def root():
     html_content = "<h2>Hello Mireya<h2>"
@@ -47,3 +51,14 @@ def show_all_users():
     for user in all_users():
         res.append(get_user_stats(user))
     return res
+@app.get("/api/{id}/get_question_list")
+def get_question_list(id):
+    try:
+        data = get_user_stats(int(id))
+        last_survey_index = data['last_survey_index']
+        survey_number = random.randint(1,len(surveys))
+        while survey_number == last_survey_index:
+            survey_number = random.randint(1,len(surveys))
+        return JSONResponse({'survey_number': survey_number, 'question_list': surveys[survey_number]})
+    except Exception as e:
+        print(e)
