@@ -4,7 +4,7 @@ from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, HTMLResponse
 
 import database_scripts
-from database_scripts import all_users,create_user, get_user_stats, add_gad7_answer
+from database_scripts import all_users,create_user, get_user_stats, add_user_answer
 from supabase import create_client, Client
 import CONFIG
 import os
@@ -34,7 +34,7 @@ def register_user(id):
 @app.get("/api/add_answer/{id}/{survey_n}&{question_n}&{text}&{date}")
 def add_answer(id, survey_n,question_n,text,date):
     try:
-        add_gad7_answer(id,survey_n,question_n,text,date)
+        add_user_answer(id,survey_n,question_n,text,date)
     except Exception as e:
         print(f"Error in add_answer: {e}")
 
