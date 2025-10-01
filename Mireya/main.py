@@ -51,9 +51,10 @@ def show_all_users():
     for user in all_users():
         res.append(get_user_stats(user))
     return res
-@app.get("/api/add_question/{survey_n}&{question_n}&{text}")
-def add_question(survey_n,question_n,text):
-    database_scripts.add_question(survey_n,question_n,text)
+@app.get("/api/add_question/{user_id}&{survey_n}&{question_n}&{text}&{global_n}&{date}")
+def add_question(user_id,survey_n,question_n,text,global_n,date):
+    database_scripts.add_user_answer(user_id,global_n,survey_n,question_n,text,date)
+
 @app.get("/api/get_questions/{survey_id}")
 def get_question(survey_id):
     return JSONResponse({'data': [i for i in database_scripts.all_questions() if i['survey_index'] == int(survey_id)]})
