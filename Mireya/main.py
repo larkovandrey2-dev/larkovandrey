@@ -17,9 +17,7 @@ SUPABASE_KEY  = supabase_url = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = supabase_url = os.getenv('SUPABASE_SERVICE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 app = FastAPI()
-surveys = {1:['Как ты чувствуешь себя после учебы?', 'Как ты чувствуешь себя при общении с однокурсниками? Появились ли у тебя друзья?', 'Тяжело ли тебе однозначно принимать решения?'],
-           2:['Опрос 2_1','Опрос 2_2'],
-           3:['Опрос 3_1','Опрос 3_2']}
+
 @app.get("/")
 def root():
     html_content = "<h2>Hello Mireya<h2>"
@@ -64,9 +62,11 @@ def get_question_list(id):
     try:
         data = get_user_stats(int(id))
         last_survey_index = data['last_survey_index']
-        survey_number = random.randint(1,len(surveys))
-        while survey_number == last_survey_index:
-            survey_number = random.randint(1,len(surveys))
-        return JSONResponse({'survey_number': survey_number, 'question_list': surveys[survey_number]})
+        questions = database_scripts.all_questions()
+        survey_index = random.choice(list(set(i['survey_index'] for i in questions)))
+        while survey_index == last_survey_index and len(list(set(i['survey_index'] for i in questions))) > 1:
+            survey_index = random.choice(list(set(i['survey_index'] for i in questions)))
+        res = [i for i in questions if i['survey_index'] == survey_index]
+        return res
     except Exception as e:
         print(e)
