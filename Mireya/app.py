@@ -43,7 +43,6 @@ async def admin_command(message: types.Message):
         await message.answer('Доступ запрещен.')
 @dp.callback_query(F.data.startswith('admin_delete_questions'))
 async def admin_delete_questions_list(call: CallbackQuery):
-    await call.message.delete()
     questions = database_scripts.all_questions()
     kb = await inline.create_deletion_question_list(questions)
     await call.message.answer('Выберите из списка вопрос, который хотите удалить:',reply_markup=kb.as_markup())
@@ -61,7 +60,7 @@ async def delete_question(call: CallbackQuery):
         for i in range(1,len(response)):
             database_scripts.change_question_index(int(response[i]['question_index']), int(response[i]['survey_index']),first_question_index+i+1)
     await call.message.answer('Удаление успешно')
-    await admin_show_questions_actions(call)
+    await admin_delete_questions_list(call)
 
 @dp.callback_query(F.data.startswith('admin_show_questions'))
 async def admin_show_questions_actions(call: CallbackQuery):
@@ -126,7 +125,6 @@ async def personal_lk(call: CallbackQuery, state: FSMContext):
     await call.message.answer(text)
 @dp.message(Command("start"))
 async def start(message: types.Message,state: FSMContext):
-    users_id = database_scripts.all_users()
     if message.from_user.id not in database_scripts.all_users():
         await message.answer('Вы в нашем сервисе впервые. Введите свой возраст')
         await state.set_state(UserConfig.age)
@@ -177,9 +175,8 @@ async def finish_test(message: types.Message,state: FSMContext):
 @dp.callback_query(F.data.startswith("start_test"))
 async def start_test(call: CallbackQuery,state: FSMContext):
     data = requests.get(f"http://127.0.0.1:8000/api/{call.from_user.id}/get_question_list").json()
-    questions = data['question_list']
-    await state.update_data(question_list=questions)
-    await state.update_data(question_n=0)
+    await state.update_data(question_list=data)
+    await state.update_data(question_n=1)
     await state.set_state(Questions.questions)
     await ask_question(call.message,state)
 

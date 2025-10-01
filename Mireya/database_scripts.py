@@ -64,7 +64,7 @@ def change_user_stat(user_id: int, stat_name: str, new_value):
     except Exception as e:
         print(f"Error in change_user_stat: {e}")
 
-
+change_user_stat(740740154, 'last_survey_index', 1)
 def change_user_stats(user_id: int, role: str, refer_id: int, surveys_count: int, last_survey_index: int, sex: str, age: int, education: str):
     '''change all stats for given user_id (function waits for every stat to be given)'''
     try:
@@ -100,10 +100,9 @@ def all_questions():
     '''returns list of dicts: {'question_index':, 'survey_index':, 'question_text':}'''
     try:
         response = supabase.table("all_questions").select("question_index, survey_index, question_text").execute()
-        return response.data
+        return sorted(response.data, key=lambda x: (x['survey_index'],x['question_index']))
     except Exception as e:
         print(f"Error in all_questions: {e}")
-
 def add_question(question_index: int, survey_index: int, question_text: str):
     try:
         new_response = {
