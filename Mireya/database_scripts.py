@@ -9,6 +9,9 @@ SUPABASE_KEY  = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+#Добавить в таблицу юзеров поле список пройденыых опросов(именно по их глобальному номеру),в таблицу с ответами добавть поле типо survey_global_number(общий номер опроса среди всех, чтобы было удобно его привязать к конкретному пользователю)
+#Потом добавляем таблицу результатов,поля:survey_global_number(чтобы их связать),результат тестирования - уровень тревожности, айди пользователя которому принадлежит результат
+
 def all_users() -> list:
     '''returns a list with every user_id'''
     response = supabase.table("users").select("user_id").execute()
