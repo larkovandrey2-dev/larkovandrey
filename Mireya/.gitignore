@@ -8,4 +8,4 @@
 .env.local
 *.env
 .idea/
-test.py
+scripts.py

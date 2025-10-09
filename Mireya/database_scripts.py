@@ -1,4 +1,5 @@
-from supabase import create_client, Client
+
+from supabase import AsyncClient, acreate_client
 import supabase
 import os
 from dotenv import load_dotenv
@@ -6,25 +7,31 @@ import matplotlib.pyplot as plt
 import io
 import matplotlib.dates as mdates
 import datetime
-
+import asyncio
 load_dotenv()
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+async def create_supabase() -> AsyncClient:
+    return await acreate_client(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_KEY
+    )
 
 
-def all_users() -> list:
+async def all_users() -> list:
+    supabase = await create_supabase()
     '''returns a list with every user_id'''
-    response = supabase.table('users').select('user_id').execute()
+    response = await supabase.table('users').select('user_id').execute()
     users = [item['user_id'] for item in response.data]
     return users
 
 
-def create_user(user_id: int, role: str, refer_id: int):
+async def create_user(user_id: int, role: str, refer_id: int):
+    supabase = await create_supabase()
     '''create user'''
     try:
-        if user_id in all_users():
+        if user_id in await all_users():
             print('User already exists')
         else:
             new_user = {
@@ -32,50 +39,54 @@ def create_user(user_id: int, role: str, refer_id: int):
                 'role': role,
                 'refer_id': refer_id,
             }
-            response = supabase.table('users').insert(new_user).execute()
+            response = await supabase.table('users').insert(new_user).execute()
             if response:
                 print('User added')
     except Exception as e:
         print(f'Error in create_user: {e}')
 
 
-def delete_user(user_id: int):
+async def delete_user(user_id: int):
     '''delete user by user_id'''
+    supabase = await create_supabase()
     try:
-        response = supabase.table('users').delete().eq('user_id', user_id).execute()
+        response = await supabase.table('users').delete().eq('user_id', user_id).execute()
     except Exception as e:
         print(f'Error in delete_question: {e}')
 
 
-def get_user_stats(user_id: int) -> dict:
+async def get_user_stats(user_id: int) -> dict:
     '''returns a dict of all stats'''
+    supabase = await create_supabase()
     try:
         user_id = int(user_id)
-        if user_id not in all_users():
+        if user_id not in await all_users():
             print('No such user, creating...')
-            create_user(user_id)
-        response = supabase.table('users').select('*').eq('user_id', user_id).execute()
+            await create_user(user_id)
+        response = await supabase.table('users').select('*').eq('user_id', user_id).execute()
         user_data = response.data[0]
         return user_data
     except Exception as e:
         print(f'Error in get_user_stats: {e}')
 
 
-def change_user_stat(user_id: int, stat_name: str, new_value):
+async def change_user_stat(user_id: int, stat_name: str, new_value):
     '''change one specific stat by its name and its new value'''
+    supabase = await create_supabase()
     try:
         new_response = {f'{stat_name}': new_value}
-        if user_id not in all_users():
+        if user_id not in await all_users():
             print(f'No such user_id for change_user_stat: {user_id}')
         else:
-            response = supabase.table('users').update(new_response).eq('user_id', user_id).execute()
+            response = await supabase.table('users').update(new_response).eq('user_id', user_id).execute()
     except Exception as e:
         print(f'Error in change_user_stat: {e}')
 
 
-def change_user_stats(user_id: int, role: str, refer_id: int, surveys_count: int, last_survey_index: int, sex: str,
+async def change_user_stats(user_id: int, role: str, refer_id: int, surveys_count: int, last_survey_index: int, sex: str,
                       age: int, education: str, all_user_global_attempts: list):
     '''change all stats for given user_id (function waits for every stat to be given)'''
+    supabase = await create_supabase()
     try:
         new_response = {
             'role': role,
@@ -87,16 +98,17 @@ def change_user_stats(user_id: int, role: str, refer_id: int, surveys_count: int
             'education': education,
             'all_user_global_attempts': all_user_global_attempts
         }
-        if user_id not in all_users():
+        if user_id not in await all_users():
             print(f'No such user_id for change_user_stats: {user_id}')
         else:
-            response = supabase.table('users').update(new_response).eq('user_id', user_id).execute()
+            response = await supabase.table('users').update(new_response).eq('user_id', user_id).execute()
     except Exception as e:
         print(f'Error in change_user_stats: {e}')
 
 
-def add_user_answer(user_id: int, attempt_global_index: int, survey_index: int, question_index: int, response_text: str,
+async def add_user_answer(user_id: int, attempt_global_index: int, survey_index: int, question_index: int, response_text: str,
                     response_date: str):
+    supabase = await create_supabase()
     try:
         new_response = {
             'user_id': user_id,
@@ -106,30 +118,37 @@ def add_user_answer(user_id: int, attempt_global_index: int, survey_index: int, 
             'response_date': response_date,
             'attempt_global_index': attempt_global_index
         }
-        response = supabase.table('user_responses').insert(new_response).execute()
+        response = await supabase.table('user_responses').insert(new_response).execute()
     except Exception as e:
         print(f'Error in add_user_answer: {e}')
 
 
-def all_questions():
+async def all_questions():
     '''returns list of dicts: {'question_index':, 'survey_index':, 'question_text':}'''
+    supabase = await create_supabase()
     try:
-        response = supabase.table('all_questions').select('question_index, survey_index, question_text').execute()
+        response = await supabase.table('all_questions').select('question_index, survey_index, question_text').execute()
         return sorted(response.data, key=lambda x: (x['survey_index'], x['question_index']))
     except Exception as e:
         print(f'Error in all_questions: {e}')
-
-
-def all_global_attempts():
-    '''returns a list of all existing global attempts'''
+async def get_answers_by_global_attempt(attempt_global_index: int):
+    supabase = await create_supabase()
     try:
-        response = supabase.table('survey_results').select('attempt_global_index').execute()
+        response = await supabase.table('user_responses').select('*').eq('attempt_global_index',attempt_global_index).execute()
+        return response.data
+    except Exception as e:
+        print(f'Error in get_answers_by_global_attempt: {e}')
+async def all_global_attempts():
+    '''returns a list of all existing global attempts'''
+    supabase = await create_supabase()
+    try:
+        response = await supabase.table('user_responses').select('attempt_global_index').execute()
         return [elem['attempt_global_index'] for elem in response.data]
     except Exception as e:
         print(f'Error in all_questions: {e}')
 
-
-def add_question(question_index: int, survey_index: int, question_text: str):
+async def add_question(question_index: int, survey_index: int, question_text: str):
+    supabase = await create_supabase()
     try:
         new_response = {
             'survey_index': int(survey_index),
@@ -140,42 +159,46 @@ def add_question(question_index: int, survey_index: int, question_text: str):
         if new_response in all_questions():
             print('This question exists')
         else:
-            response = supabase.table('all_questions').insert(new_response).execute()
+            response = await supabase.table('all_questions').insert(new_response).execute()
     except Exception as e:
         print(f'Error in add_gad7_answer: {e}')
 
 
-def change_question(question_index: int, survey_index: int, new_question_text: str):
+async def change_question(question_index: int, survey_index: int, new_question_text: str):
     '''change question text by its question_index and survey_index'''
+    supabase = await create_supabase()
     try:
         new_response = {'question_text': new_question_text}
-        response = supabase.table('all_questions').update(new_response).eq('question_index', question_index).eq(
+        response = await supabase.table('all_questions').update(new_response).eq('question_index', question_index).eq(
             'survey_index', survey_index).execute()
     except Exception as e:
         print(f'Error in change_question: {e}')
 
 
-def change_question_index(question_index: int, survey_index: int, new_question_index: int):
+async def change_question_index(question_index: int, survey_index: int, new_question_index: int):
     '''change question index by its question_index and survey_index'''
+    supabase = await create_supabase()
     try:
         new_response = {'question_index': new_question_index}
-        response = supabase.table('all_questions').update(new_response).eq('question_index', question_index).eq(
+        response = await supabase.table('all_questions').update(new_response).eq('question_index', question_index).eq(
             'survey_index', survey_index).execute()
     except Exception as e:
         print(f'Error in change_question_index: {e}')
 
 
-def delete_question(question_index: int, survey_index: int):
+async def delete_question(question_index: int, survey_index: int):
     '''delete question by its question_index and survey_index'''
+    supabase = await create_supabase()
     try:
-        response = supabase.table('all_questions').delete().eq('question_index', question_index).eq('survey_index',
+        response = await supabase.table('all_questions').delete().eq('question_index', question_index).eq('survey_index',
                                                                                                     survey_index).execute()
     except Exception as e:
         print(f'Error in delete_question: {e}')
 
 
-def add_survey_result(user_id: int, attempt_global_index: int, survey_index: int, date: str, result: int):
+async def add_survey_result(user_id: int, attempt_global_index: int, survey_index: int, date: str, result: int):
     '''add a result for a single survey attempt'''
+    supabase = await create_supabase()
     try:
         new_response = {
             'user_id': user_id,
@@ -184,18 +207,24 @@ def add_survey_result(user_id: int, attempt_global_index: int, survey_index: int
             'date': date,
             'result': result
         }
-        if attempt_global_index in all_global_attempts():
+        if attempt_global_index in await all_global_attempts():
             print(f'Global attempt with index {attempt_global_index} already exists')
         else:
-            response = supabase.table('survey_results').insert(new_response).execute()
+            response = await supabase.table('survey_results').insert(new_response).execute()
     except Exception as e:
         print(f'Error in add_survey_result: {e}')
-
-
-def create_results_chart(user_id: int, survey_index: int, type = 'linear'): # type can be 'linear', 'area' or 'bar'
-    '''creates a chart for all user's results in a given survey'''
+async def get_surveys_results(user_id: int):
+    supabase = await create_supabase()
     try:
-        response = supabase.table('survey_results').select('*').eq('user_id', user_id).eq('survey_index', survey_index).execute()
+        response = await supabase.table('survey_results').select('*').eq('user_id', user_id).execute()
+        return response.data[0]
+    except Exception as e:
+        print(f'Error in get_surveys_results: {e}')
+async def create_results_chart(user_id: int, survey_index: int, type = 'linear'): # type can be 'linear', 'area' or 'bar'
+    '''creates a chart for all user's results in a given survey'''
+    supabase = await create_supabase()
+    try:
+        response = await supabase.table('survey_results').select('*').eq('user_id', user_id).eq('survey_index', survey_index).execute()
         data_with_datetime = []
         for item in response.data:
             date_str = item['date']
