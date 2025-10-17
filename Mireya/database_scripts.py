@@ -1,4 +1,3 @@
-
 from supabase import AsyncClient, acreate_client
 import supabase
 import os

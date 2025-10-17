@@ -1,0 +1,5 @@
+1) Download .exe from https://ollama.ai
+2) Load model from command line: "ollama pull gemma3:1b"
+3) Check available models: "ollama list"
+4) Execute code
+5) Use "ollama stop gemma3:1b" to stop process
