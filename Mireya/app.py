@@ -158,17 +158,17 @@ async def start(message: types.Message, state: FSMContext):
         await message.answer('Вы в нашем сервисе впервые. Введите свой возраст')
         await state.set_state(UserConfig.age)
     else:
-        req = requests.get(f"http://127.0.0.1:8000/api/register_user/{message.from_user.id}")
         keyboard = InlineKeyboardBuilder()
         keyboard.row(types.InlineKeyboardButton(text='Пройти опрос', callback_data='start_test'))
         keyboard.row(types.InlineKeyboardButton(text='Личный кабинет', callback_data='personal_lk'))
         username = message.from_user.username
         if str(message.from_user.id) not in ADMINS:
             text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
-            await message.answer(text, reply_markup=keyboard.as_markup())
+            await message.answer(text,reply_markup=types.ReplyKeyboardRemove())
         if str(message.from_user.id) in ADMINS:
             text = f'''Добро пожаловать, администратор (/admin)'''
-            await message.answer(text, reply_markup=keyboard.as_markup())
+            await message.answer(text,reply_markup=types.ReplyKeyboardRemove())
+        await message.answer('Выберите действие: ',reply_markup=keyboard.as_markup())
 
 
 @dp.message(UserConfig.age)
@@ -201,10 +201,14 @@ async def finish_setup(message: types.Message, state: FSMContext):
     data = await state.get_data()
     sex = data['sex'].split()[0]
     age = data['age']
+    if str(message.from_user.id) in ADMINS:
+        await database_scripts.create_user(message.from_user.id, 'admin',0)
+    else:
+        await database_scripts.create_user(message.from_user.id, 'user',0)
     await database_scripts.change_user_stat(message.from_user.id,'education',education)
     await database_scripts.change_user_stat(message.from_user.id,'sex',sex)
     await database_scripts.change_user_stat(message.from_user.id,'age',int(age))
-
+    await start(message,state)
 
 async def ask_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -232,7 +236,9 @@ async def finish_test(message: types.Message, state: FSMContext):
     await database_scripts.change_user_stat(message.from_user.id, 'all_user_global_attempts', results_list)
     await state.clear()
     await message.answer('Опрос заверешен. Твои ответы получены, и сейчас ты увидишь свой уровень стресса/тревожности')
-    user_answers = [i['response_text'] for i in await database_scripts.get_answers_by_global_attempt(int(global_n))]
+    user_answers = await database_scripts.get_answers_by_global_attempt(int(global_n))
+    user_answers.sort(key=lambda x: x['question_index'])
+    user_answers = [i['response_text'] for i in user_answers]
     ans_form = await scripts.form_gad7_survey_1(user_answers,user_data['sex'],user_data['age'],user_data['education'])
     predicted_level = await scripts.predict_stress_level(ans_form)
     await message.answer(f'Предполагаемый уровень стресса/тревожности: {predicted_level}%')

@@ -146,7 +146,6 @@ async def all_global_attempts():
         return [elem['attempt_global_index'] for elem in response.data]
     except Exception as e:
         print(f'Error in all_questions: {e}')
-
 async def add_question(question_index: int, survey_index: int, question_text: str):
     supabase = await create_supabase()
     try:
