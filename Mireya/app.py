@@ -1,19 +1,19 @@
 import asyncio
-import json
 import logging
-import requests
 import datetime
 import os
-import aiohttp
-from watchfiles import awatch
+from email import message
 
+import aiohttp
+from aiogram.enums import ParseMode
+from aiogram.types import InlineKeyboardButton
 import database_scripts
 import kbs.inline as inline
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import CallbackQuery, sticker, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import CallbackQuery, sticker, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from supabase import create_client, Client
 from datetime import date
@@ -28,7 +28,9 @@ bot = Bot(token="8466015804:AAEt2BWKawjYRbBxhiinKB3JCZaw0-1NMTU")
 
 dp = Dispatcher()
 
-
+class UserChanges(StatesGroup):
+    age = State()
+    education = State()
 class UserConfig(StatesGroup):
     age = State()
     sex = State()
@@ -68,12 +70,15 @@ async def delete_question(call: CallbackQuery):
     question_index = int(data[3])
     await database_scripts.delete_question(question_index, survey_index)
     async with aiohttp.ClientSession() as session:
-        response = await session.get(f"http://127.0.0.1:8000/api/get_questions/{survey_index}").json()['data']
+        response = await session.get(f"http://127.0.0.1:8000/api/get_questions/{survey_index}")
+        response = await response.json()
+        response = response["data"]
     if response:
         first_question_index = int(response[0]['question_index'])
         for i in range(1, len(response)):
-            await database_scripts.change_question_index(int(response[i]['question_index']), int(response[i]['survey_index']),
-                                                   first_question_index + i + 1)
+            await database_scripts.change_question_index(int(response[i]['question_index']),
+                                                         int(response[i]['survey_index']),
+                                                         first_question_index + i + 1)
     await call.message.answer('Удаление успешно')
     await admin_delete_questions_list(call)
 
@@ -114,7 +119,8 @@ async def new_question(message: types.Message, state: FSMContext):
     quest_index = 1
     try:
         async with aiohttp.ClientSession() as session:
-            response = await session.get(f"http://127.0.0.1:8000/api/get_questions/{survey_index}").json()
+            response = await session.get(f"http://127.0.0.1:8000/api/get_questions/{survey_index}")
+            response = await response.json()
         if response['data']:
             quest_index = response['data'][-1]['question_index'] + 1
 
@@ -135,23 +141,79 @@ async def commit_question(message: types.Message, state: FSMContext):
 
 
 @dp.callback_query(F.data.startswith('personal_lk'))
-async def personal_lk(call: CallbackQuery, state: FSMContext):
+async def personal_lk(call: CallbackQuery):
     req = f"http://127.0.0.1:8000/api/get_user/{call.from_user.id}"
     async with aiohttp.ClientSession() as session:
         data = await session.get(req)
         data = await data.json()
-    text = f'''Ваш username: @{call.from_user.username}
-Ваш ID: {call.message.from_user.id}
-Количество пройденных опросов: {data['surveys_count']}\n'''
+    text = f'''*Профиль пользователя @{call.from_user.username}*\n
+🆔: {call.message.from_user.id}\n
+Пройдено опросов ✔️: {data['surveys_count']}\n
+Пол: {'👨' if data['sex'] == 'Мужской' else '👩'}\n
+Возраст: {data['age']}\n
+Образование 🎓: {data['education']}\n\n'''
     if data['role'] == 'user':
         text += 'Ваша роль: пользователь'
     elif data['role'] == 'admin':
         text += 'Ваша роль: администратор'
     elif data['role'] == 'psychologist':
         text += 'Ваша роль: психолог'
-    await call.message.answer(text)
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="Изменить возраст",callback_data="lk_change_age"))
+    builder.row(InlineKeyboardButton(text="Изменить пол",callback_data="lk_change_sex"))
+    builder.row(InlineKeyboardButton(text="Изменить образование",callback_data="lk_change_education"))
+    await call.message.answer(text,parse_mode=ParseMode.MARKDOWN,reply_markup=builder.as_markup())
+@dp.callback_query(F.data.startswith('lk_change_sex'))
+async def lk_change_sex(call: CallbackQuery):
+    user_data = await database_scripts.get_user_stats(call.from_user.id)
+    sex = user_data['sex']
+    if sex == 'Мужской':
+        await database_scripts.change_user_stat(int(call.from_user.id), 'sex','Женский')
+    else:
+        await database_scripts.change_user_stat(int(call.from_user.id), 'sex', 'Мужской')
+    await call.message.delete()
+    await personal_lk(call)
 
 
+@dp.callback_query(F.data.startswith('lk_change_age'))
+async def lk_change_age(call: CallbackQuery,state: FSMContext):
+    await call.message.delete()
+    user_data = await database_scripts.get_user_stats(call.from_user.id)
+    await call.message.answer("Введите свой возраст: ")
+    await state.set_state(UserChanges.age)
+    await state.update_data(callback=call)
+@dp.message(UserChanges.age)
+async def lk_change_age_commit(message: types.Message,state: FSMContext):
+    age = message.text
+    data = await state.get_data()
+    if not age.isdecimal() or not(16 < int(age) < 100):
+        await message.answer('Введите корректный возраст: ')
+    else:
+        await database_scripts.change_user_stat(message.from_user.id, 'age', int(age))
+        await personal_lk(data['callback'])
+        await state.clear()
+@dp.callback_query(F.data.startswith('lk_change_education'))
+async def lk_change_education(call: CallbackQuery,state: FSMContext):
+    user_data = await database_scripts.get_user_stats(call.from_user.id)
+    kb = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=[[KeyboardButton(text='Высшее образование')],
+                                                             [KeyboardButton(text='Основное общее образование')],
+                                                             [KeyboardButton(text='Среднее общее')]])
+    await call.message.delete()
+    await call.message.answer('Выберите уровень образования: ',reply_markup=kb)
+    await state.set_state(UserChanges.education)
+    await state.update_data(callback=call)
+@dp.message(UserChanges.education)
+async def lk_change_education_commit(message: types.Message,state: FSMContext):
+    education = message.text
+    data = await state.get_data()
+    if education not in ['Высшее образование','Основное общее образование','Среднее общее']:
+        await message.answer('Выберите корректный уровень образования: ')
+    else:
+        await database_scripts.change_user_stat(message.from_user.id, 'education', education)
+        await message.answer('Изменение успешно!',reply_markup=types.ReplyKeyboardRemove())
+        await personal_lk(data['callback'])
+        await state.clear()
+@dp.message(F.text == "Назад 🔙")
 @dp.message(Command("start"))
 async def start(message: types.Message, state: FSMContext):
     if message.from_user.id not in await database_scripts.all_users():
@@ -164,17 +226,17 @@ async def start(message: types.Message, state: FSMContext):
         username = message.from_user.username
         if str(message.from_user.id) not in ADMINS:
             text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
-            await message.answer(text,reply_markup=types.ReplyKeyboardRemove())
+            await message.answer(text, reply_markup=types.ReplyKeyboardRemove())
         if str(message.from_user.id) in ADMINS:
             text = f'''Добро пожаловать, администратор (/admin)'''
-            await message.answer(text,reply_markup=types.ReplyKeyboardRemove())
-        await message.answer('Выберите действие: ',reply_markup=keyboard.as_markup())
+            await message.answer(text, reply_markup=types.ReplyKeyboardRemove())
+        await message.answer('Выберите действие: ', reply_markup=keyboard.as_markup())
 
 
 @dp.message(UserConfig.age)
 async def age_setup(message: types.Message, state: FSMContext):
     age = message.text
-    if not age.isdigit() or not (12 < int(age) < 100):
+    if not age.isdigit() or not (14 < int(age) < 100):
         await message.answer('Введите корректный возраст')
     else:
         await state.update_data(age=age)
@@ -201,14 +263,18 @@ async def finish_setup(message: types.Message, state: FSMContext):
     data = await state.get_data()
     sex = data['sex'].split()[0]
     age = data['age']
-    if str(message.from_user.id) in ADMINS:
-        await database_scripts.create_user(message.from_user.id, 'admin',0)
+    if education not in ['Высшее образование','Основное общее образование','Среднее общее']:
+        await message.answer('Выберите корректный уровень образования: ')
     else:
-        await database_scripts.create_user(message.from_user.id, 'user',0)
-    await database_scripts.change_user_stat(message.from_user.id,'education',education)
-    await database_scripts.change_user_stat(message.from_user.id,'sex',sex)
-    await database_scripts.change_user_stat(message.from_user.id,'age',int(age))
-    await start(message,state)
+        if str(message.from_user.id) in ADMINS:
+            await database_scripts.create_user(message.from_user.id, 'admin', 0)
+        else:
+            await database_scripts.create_user(message.from_user.id, 'user', 0)
+        await database_scripts.change_user_stat(message.from_user.id, 'education', education)
+        await database_scripts.change_user_stat(message.from_user.id, 'sex', sex)
+        await database_scripts.change_user_stat(message.from_user.id, 'age', int(age))
+        await start(message, state)
+
 
 async def ask_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -225,7 +291,6 @@ async def finish_test(message: types.Message, state: FSMContext):
     global_n = data['global_n']
     surveys_user_c = user_data['surveys_count']
     results_list = user_data['all_user_global_attempts']
-    print(global_n)
     if results_list is None:
         results_list = []
     results_list.append(global_n)
@@ -239,11 +304,14 @@ async def finish_test(message: types.Message, state: FSMContext):
     user_answers = await database_scripts.get_answers_by_global_attempt(int(global_n))
     user_answers.sort(key=lambda x: x['question_index'])
     user_answers = [i['response_text'] for i in user_answers]
-    ans_form = await scripts.form_gad7_survey_1(user_answers,user_data['sex'],user_data['age'],user_data['education'])
+    ans_form = await scripts.form_gad7_survey_1(user_answers, user_data['sex'], user_data['age'],
+                                                user_data['education'])
     predicted_level = await scripts.predict_stress_level(ans_form)
-    await message.answer(f'Предполагаемый уровень стресса/тревожности: {predicted_level}%')
-    await database_scripts.add_survey_result(message.from_user.id,global_n,survey_n,str(datetime.datetime.now().strftime('%Y-%M-%D %H:%M:%S')),predicted_level)
-
+    kb = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Назад 🔙')]],resize_keyboard=True)
+    await message.answer(f'Предполагаемый уровень стресса/тревожности: {predicted_level}%', reply_markup=kb)
+    await database_scripts.add_survey_result(message.from_user.id, global_n, survey_n,
+                                             str(datetime.datetime.now().strftime('%Y-%M-%D %H:%M:%S')),
+                                             predicted_level)
 
 
 @dp.callback_query(F.data.startswith("start_test"))
@@ -254,7 +322,6 @@ async def start_test(call: CallbackQuery, state: FSMContext):
         data = await data.json()
     global_surveys_n = list(set(await database_scripts.all_global_attempts()))
     global_surveys_n.sort()
-    print(global_surveys_n)
     if not global_surveys_n:
         global_surveys_n = [0]
     await state.update_data(question_list=data)
@@ -271,7 +338,6 @@ async def message_test(message: types.Message, state: FSMContext):
     question_n = data['question_n']
     question_list = data['question_list']
     global_n = data['global_n']
-    print(global_n)
     survey_n = question_list[0]['survey_index']
     async with aiohttp.ClientSession() as session:
         await session.get(

@@ -1,4 +1,3 @@
-
 from supabase import AsyncClient, acreate_client
 import supabase
 import os
@@ -8,10 +7,13 @@ import io
 import matplotlib.dates as mdates
 import datetime
 import asyncio
+
 load_dotenv()
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
+
+
 async def create_supabase() -> AsyncClient:
     return await acreate_client(
         SUPABASE_URL,
@@ -83,8 +85,9 @@ async def change_user_stat(user_id: int, stat_name: str, new_value):
         print(f'Error in change_user_stat: {e}')
 
 
-async def change_user_stats(user_id: int, role: str, refer_id: int, surveys_count: int, last_survey_index: int, sex: str,
-                      age: int, education: str, all_user_global_attempts: list):
+async def change_user_stats(user_id: int, role: str, refer_id: int, surveys_count: int, last_survey_index: int,
+                            sex: str,
+                            age: int, education: str, all_user_global_attempts: list):
     '''change all stats for given user_id (function waits for every stat to be given)'''
     supabase = await create_supabase()
     try:
@@ -106,8 +109,9 @@ async def change_user_stats(user_id: int, role: str, refer_id: int, surveys_coun
         print(f'Error in change_user_stats: {e}')
 
 
-async def add_user_answer(user_id: int, attempt_global_index: int, survey_index: int, question_index: int, response_text: str,
-                    response_date: str):
+async def add_user_answer(user_id: int, attempt_global_index: int, survey_index: int, question_index: int,
+                          response_text: str,
+                          response_date: str):
     supabase = await create_supabase()
     try:
         new_response = {
@@ -131,13 +135,18 @@ async def all_questions():
         return sorted(response.data, key=lambda x: (x['survey_index'], x['question_index']))
     except Exception as e:
         print(f'Error in all_questions: {e}')
+
+
 async def get_answers_by_global_attempt(attempt_global_index: int):
     supabase = await create_supabase()
     try:
-        response = await supabase.table('user_responses').select('*').eq('attempt_global_index',attempt_global_index).execute()
+        response = await supabase.table('user_responses').select('*').eq('attempt_global_index',
+                                                                         attempt_global_index).execute()
         return response.data
     except Exception as e:
         print(f'Error in get_answers_by_global_attempt: {e}')
+
+
 async def all_global_attempts():
     '''returns a list of all existing global attempts'''
     supabase = await create_supabase()
@@ -146,6 +155,8 @@ async def all_global_attempts():
         return [elem['attempt_global_index'] for elem in response.data]
     except Exception as e:
         print(f'Error in all_questions: {e}')
+
+
 async def add_question(question_index: int, survey_index: int, question_text: str):
     supabase = await create_supabase()
     try:
@@ -155,7 +166,7 @@ async def add_question(question_index: int, survey_index: int, question_text: st
             'question_text': str(question_text)
         }
 
-        if new_response in all_questions():
+        if new_response in await all_questions():
             print('This question exists')
         else:
             response = await supabase.table('all_questions').insert(new_response).execute()
@@ -189,8 +200,9 @@ async def delete_question(question_index: int, survey_index: int):
     '''delete question by its question_index and survey_index'''
     supabase = await create_supabase()
     try:
-        response = await supabase.table('all_questions').delete().eq('question_index', question_index).eq('survey_index',
-                                                                                                    survey_index).execute()
+        response = await supabase.table('all_questions').delete().eq('question_index', question_index).eq(
+            'survey_index',
+            survey_index).execute()
     except Exception as e:
         print(f'Error in delete_question: {e}')
 
@@ -212,6 +224,8 @@ async def add_survey_result(user_id: int, attempt_global_index: int, survey_inde
             response = await supabase.table('survey_results').insert(new_response).execute()
     except Exception as e:
         print(f'Error in add_survey_result: {e}')
+
+
 async def get_surveys_results(user_id: int):
     supabase = await create_supabase()
     try:
@@ -219,11 +233,14 @@ async def get_surveys_results(user_id: int):
         return response.data[0]
     except Exception as e:
         print(f'Error in get_surveys_results: {e}')
-async def create_results_chart(user_id: int, survey_index: int, type = 'linear'): # type can be 'linear', 'area' or 'bar'
+
+
+async def create_results_chart(user_id: int, survey_index: int, type='linear'):  # type can be 'linear', 'area' or 'bar'
     '''creates a chart for all user's results in a given survey'''
     supabase = await create_supabase()
     try:
-        response = await supabase.table('survey_results').select('*').eq('user_id', user_id).eq('survey_index', survey_index).execute()
+        response = await supabase.table('survey_results').select('*').eq('user_id', user_id).eq('survey_index',
+                                                                                                survey_index).execute()
         data_with_datetime = []
         for item in response.data:
             date_str = item['date']
@@ -264,11 +281,12 @@ async def create_results_chart(user_id: int, survey_index: int, type = 'linear')
         # plt.savefig('C:/Users/Vlad/Desktop/my_plot.png') # to save locally
         img_buffer.seek(0)
         plt.close()
-        
+
         return img_buffer
 
     except Exception as e:
         print(f'Error in create_results_chart: {e}')
+
 
 # create_results_chart(user_id=10,survey_index=1,type='area')
 '''
