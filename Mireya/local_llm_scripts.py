@@ -1,27 +1,34 @@
+from http.client import responses
+from aiohttp import payload_type
+from flask import Flask, request, jsonify
 import requests
+from httpx import stream
+
+app = Flask(__name__)
+
 
 def create_ollama_text_to_dict_request(prompt, model="gemma3:1b"):
-    
     url = "http://localhost:11434/api/generate"
-    
+
     payload = {
         "model": model,
         "prompt": prompt,
         "stream": False
     }
-    
+
     try:
         response = requests.post(url, json=payload)
-        
+
         if response.status_code == 200:
             result = response.json()
             print(result)
             return result["response"]
         else:
             return f"Ошибка: {response.status_code}"
-            
+
     except Exception as e:
         return f"Ошибка соединения: {e}"
+
 
 def analyze_health_complaint_precise(complaint_text):
     prompt = f"""Проанализируй текст шаг за шагом:
@@ -45,13 +52,25 @@ def analyze_health_complaint_precise(complaint_text):
     "study": результат из шага 5 (число),
     "work": результат из шага 6 (число),
     }}"""
-    
+
     return create_ollama_text_to_dict_request(prompt)
+
 
 user_text = """Сегодня я чувствую себя ужасно. Вчера лег в 3 ночи, проснулся в 7 утра. 
 Сегодня выходной и я весь день играл в компьютер часов 5-6, не мог оторваться. 
 Я социофоб и боюсь подойти познакомиться с кем-то на учёбе, поэтому все время в университете я хожу один, одногруппники меня сторонятся.
 Постоянно устаю, а после учебы приходится работать, из-за этого на работе постоянные проблемы, начальник довел до белого каления и коллеги жалуются на меня."""
 
+
+@app.route("/process", methods=["POST"])
+def process():
+    data = request.json
+    text = data.get("text", "")
+    result = analyze_health_complaint_precise(text)
+    return jsonify({"response": result})
+
+
+if __name__ == "__main__":
+    app.run(port=5000)
 # print(analyze_health_complaint_precise(user_text))
 # ollama stop gemma3:1b
