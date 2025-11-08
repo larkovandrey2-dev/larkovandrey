@@ -1,4 +1,11 @@
+import io
+import datetime
+
 from supabase import acreate_client
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
+
 
 class DatabaseService:
     def __init__(self,supabase_url, supabase_key):
@@ -124,6 +131,13 @@ class DatabaseService:
             return [elem['attempt_global_index'] for elem in response.data]
         except Exception as e:
             print(f'Error in all_questions: {e}')
+    async def all_global_attempts_results(self):
+        '''returns a list of all existing global attempts'''
+        try:
+            response = await self.client.table('survey_results').select('attempt_global_index').execute()
+            return [elem['attempt_global_index'] for elem in response.data]
+        except Exception as e:
+            print(f'Error in all_questions: {e}')
 
     async def add_question(self,question_index: int, survey_index: int, question_text: str):
         try:
@@ -179,7 +193,8 @@ class DatabaseService:
                 'date': date,
                 'result': result
             }
-            if attempt_global_index in await self.all_global_attempts():
+
+            if attempt_global_index in await self.all_global_attempts_results():
                 print(f'Global attempt with index {attempt_global_index} already exists')
             else:
                 response = await self.client.table('survey_results').insert(new_response).execute()
@@ -192,6 +207,61 @@ class DatabaseService:
             return response.data[0]
         except Exception as e:
             print(f'Error in get_surveys_results: {e}')
+
+    async def create_results_chart(self, user_id: int, survey_index: int, type='linear'):  # type can be 'linear', 'area' or 'bar'
+        '''creates a chart for all user's results in a given survey'''
+
+        try:
+            response = await self.client.table('survey_results').select('*').eq('user_id', user_id).eq('survey_index',survey_index).execute()
+            print(response)
+            data_with_datetime = []
+            for item in response.data:
+                date_str = item['date']
+                try:
+                    dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    print(f"Invalid date format: {date_str}")
+                    continue
+                data_with_datetime.append({
+                    'date': date_str,
+                    'datetime': dt_obj,
+                    'result': item['result']
+                })
+            data_sorted = sorted(data_with_datetime, key=lambda x: x['datetime'])
+            if not data_sorted:
+                print('No data found')
+                return False
+            data_x = [elem['date'] for elem in data_sorted]
+            data_y = [elem['result'] for elem in data_sorted]
+            plt.figure()
+            if type == 'linear':
+                plt.plot(data_x, data_y)
+                plt.xlabel('Дата прохождения')
+                plt.ylabel('Уровень стресса')
+                plt.xticks(rotation=45)
+            elif type == 'area':
+                plt.fill_between(data_x, data_y, alpha=0.3, color='blue')
+                plt.plot(data_x, data_y, color='blue', alpha=0.8)
+                plt.xlabel('Дата прохождения')
+                plt.ylabel('Уровень стресса')
+                plt.xticks(rotation=45)
+            elif type == 'bar':
+                plt.bar(data_x, data_y, color='blue', alpha=0.5)
+                plt.xlabel('Дата прохождения')
+                plt.ylabel('Уровень стресса')
+                plt.xticks(rotation=45)
+            plt.title('Динамика уровня стресса')
+            plt.grid(True)
+            plt.tight_layout()
+            img_buffer = io.BytesIO()
+            plt.savefig(img_buffer, format='png')
+            img_buffer.seek(0)
+            plt.close()
+
+            return img_buffer
+
+        except Exception as e:
+            print(f'Error in create_results_chart: {e}')
 
 
 

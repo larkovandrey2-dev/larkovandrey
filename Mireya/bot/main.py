@@ -1,7 +1,7 @@
 import asyncio
 from aiogram import Bot, Dispatcher
-from config import BOT_TOKEN
-from handlers import user,admin,survey,start, llm_talk
+from bot.config import BOT_TOKEN
+from bot.handlers import user,admin,survey,start, llm_talk
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()

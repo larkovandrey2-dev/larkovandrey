@@ -18,7 +18,6 @@ async def ask_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
     question_n = data['question_n']
     question_list = data['question_list']
-    print(question_list)
     current_question = [i['question_text'] for i in question_list if i['question_index'] == question_n][0]
     await message.answer(current_question)
 
@@ -52,8 +51,9 @@ async def finish_test(message: types.Message, state: FSMContext):
         await message.answer("Ошибка в корректности введеных ответов. Пройдите тест еще раз и попытайтесь отвечать правильно")
     else:
         await message.answer(f'Предполагаемый уровень стресса/тревожности: {predicted_level}%', reply_markup=kb)
+    print(survey_n)
     await db.add_survey_result(message.from_user.id, global_n, survey_n,
-                                             str(datetime.now().strftime('%Y-%M-%D %H:%M:%S')),
+                                             str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
                                              predicted_level)
 
 
@@ -63,6 +63,7 @@ async def start_test(call: CallbackQuery, state: FSMContext):
     await state.clear()
     data = await api.get_question_list(call.from_user.id)
     global_surveys_n = list(set(await db.all_global_attempts()))
+    print(global_surveys_n)
     global_surveys_n.sort()
     if not global_surveys_n:
         global_surveys_n = [0]
