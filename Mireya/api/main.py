@@ -1,6 +1,7 @@
 import os
 import random
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI, Body, HTTPException
@@ -17,7 +18,6 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
 db = DatabaseService(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
-app = FastAPI(title="Mireya API", version="1.1")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,10 +43,13 @@ class QuestionIn(BaseModel):
     global_n: int
     date: str
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     await db.create_client()
-    print("Supabase client initialized")
+    print("Supabase initialized")
+    yield
+app = FastAPI(title="Mireya API", version="1.1", lifespan=lifespan)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():

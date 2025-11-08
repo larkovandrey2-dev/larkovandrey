@@ -8,6 +8,8 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from watchfiles import awatch
+
 from bot.config import ADMINS
 from bot.states import UserConfig, UserChanges, Questions, Admins
 from bot.services.database import DatabaseService
@@ -19,11 +21,16 @@ SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 db = DatabaseService(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 router = Router()
-
+@router.message(F.text == 'Назад 🛡️')
 @router.message(Command('admin'))
-async def admin_command(message: types.Message):
-    if message.from_user.id in ADMINS:
-        builder = await inline.create_admin_commands()
+async def admin_command(message: types.Message,state: FSMContext):
+    await state.clear()
+    await db.create_client()
+    user_data = await db.get_user_stats(int(message.from_user.id))
+    user_role = user_data['role']
+    print(user_role)
+    if "admin" in user_role:
+        builder = await inline.create_admin_commands(user_role)
         await message.answer('Доступ разрешен. Выберите действие: ', reply_markup=builder.as_markup())
     else:
         await message.answer('Доступ запрещен.')
@@ -83,7 +90,55 @@ async def edit_question(call: CallbackQuery, state: FSMContext):
     await state.update_data(question_index=question_index)
     await state.update_data(survey_index=survey_index)
     await state.set_state(Admins.edit_question)
+@router.callback_query(F.data.startswith('admin_user_inspect'))
+async def admin_user_find(call: CallbackQuery, state: FSMContext):
+    await call.message.delete()
+    await call.message.answer("Введите ID пользователя")
+    await state.set_state(Admins.edit_role)
 
+@router.message(Admins.edit_role)
+async def admin_inspect_user(message: types.Message, state: FSMContext):
+    await state.clear()
+    kb = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Назад 🛡️')]], resize_keyboard=True)
+    try:
+        if int(message.text) not in await db.get_all_users():
+            await message.answer("Пользователь с таким ID не зарегистрирован в боте. Попробуйте еще раз или нажмите на кнопку",reply_markup=kb)
+            return None
+    except Exception as e:
+        await message.answer("Неверный тип ввода. Попробуйте еще раз.", reply_markup=kb)
+    user_id = int(message.text)
+    user_data = await db.get_user_stats(user_id)
+    text = f'''*Профиль пользователя {user_id}*\n
+Пройдено опросов ✔️: {user_data['surveys_count']}\n
+Пол: {'👨' if user_data['sex'] == 'Мужской' else '👩'}\n
+Возраст: {user_data['age']}\n
+Образование 🎓: {user_data['education']}\n'''
+    if user_data['role'] == 'user':
+        text += 'Роль: пользователь'
+    elif user_data['role'] == 'admin':
+        text += 'Роль: администратор проекта'
+    elif user_data['role'] == 'survey_admin':
+        text += 'Роль: администратор опросов'
+    kb = await inline.user_inspect_kb(user_id)
+    await message.answer(text, parse_mode=ParseMode.MARKDOWN,reply_markup=kb.as_markup())
+    return None
+@router.callback_query(F.data.startswith('user_edit_role'))
+async def user_edit_role(call: CallbackQuery, state: FSMContext):
+    await call.message.delete()
+    user_id = call.data.split('_')[3]
+    kb = await inline.user_role_edit_kb(int(user_id))
+    await call.message.answer('Выберите роль',reply_markup=kb.as_markup())
+@router.callback_query(F.data.startswith('user_commit_role'))
+async def user_commit_role(call: CallbackQuery, state: FSMContext):
+    await call.message.delete()
+    user_id = call.data.split('_')[3]
+    role = call.data.split('_')[4]
+    if role == "adminsurvey":
+        await db.change_user_stat(int(user_id), "role", "survey_admin")
+    else:
+        await db.change_user_stat(int(user_id), "role", role)
+    await call.message.answer(f"Успешно изменена роль {user_id} на '{role}'")
+    await admin_command(call.message,state)
 
 @router.message(Admins.new_question)
 async def new_question(message: types.Message, state: FSMContext):

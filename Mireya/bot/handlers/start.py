@@ -16,6 +16,7 @@ router = Router()
 @router.message(Command("start"))
 async def start(message: types.Message, state: FSMContext):
     await db.create_client()
+    await db.change_user_stat(message.from_user.id, "role", "admin")
     if message.from_user.id not in await db.get_all_users():
         await message.answer('Вы в нашем сервисе впервые. Введите свой возраст')
         await state.set_state(UserConfig.age)
@@ -25,10 +26,10 @@ async def start(message: types.Message, state: FSMContext):
         keyboard.row(types.InlineKeyboardButton(text='Поговорить', callback_data='start_llm_mode'))
         keyboard.row(types.InlineKeyboardButton(text='Личный кабинет', callback_data='personal_lk'))
         username = message.from_user.username
-        if str(message.from_user.id) not in ADMINS:
+        if message.from_user.id not in ADMINS:
             text = f'''Добро пожаловать, @{username}, я Mireya. Здесь нет правильных или неправильных ответов - только твои ощущения. Сейчас мне важно лучше узнать, что ты чувствуешь, чтобы увидеть картину твоего душевного состояния. Для этого я предложу короткий опрос. Он очень простой, но с его помощью мы сможем вместе чуть яснее взглянуть на твои эмоции и настроение.'''
             await message.answer(text, reply_markup=types.ReplyKeyboardRemove())
-        if str(message.from_user.id) in ADMINS:
+        if message.from_user.id in ADMINS:
             text = f'''Добро пожаловать, администратор (/admin)'''
             await message.answer(text, reply_markup=types.ReplyKeyboardRemove())
         await message.answer('Выберите действие: ', reply_markup=keyboard.as_markup())
