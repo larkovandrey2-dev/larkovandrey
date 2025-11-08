@@ -2,14 +2,10 @@ import os
 from datetime import datetime
 
 from aiogram import Router, types, F
-from aiogram.client.session import aiohttp
-from aiogram.enums import ParseMode
-from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from bot.config import ADMINS
-from bot.states import UserConfig, UserChanges, Questions
+
+from bot.states import Questions
 from bot.services.database import DatabaseService
 import bot.services.api as api
 from bot.utils import gad7_predict as gad7
@@ -52,7 +48,10 @@ async def finish_test(message: types.Message, state: FSMContext):
                                                 user_data['education'])
     predicted_level = await gad7.predict_stress_level(ans_form)
     kb = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Назад 🔙')]],resize_keyboard=True)
-    await message.answer(f'Предполагаемый уровень стресса/тревожности: {predicted_level}%', reply_markup=kb)
+    if predicted_level == -1:
+        await message.answer("Ошибка в корректности введеных ответов. Пройдите тест еще раз и попытайтесь отвечать правильно")
+    else:
+        await message.answer(f'Предполагаемый уровень стресса/тревожности: {predicted_level}%', reply_markup=kb)
     await db.add_survey_result(message.from_user.id, global_n, survey_n,
                                              str(datetime.now().strftime('%Y-%M-%D %H:%M:%S')),
                                              predicted_level)
