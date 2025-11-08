@@ -9,3 +9,5 @@
 *.env
 .idea/
 scripts.py
+.DS_Store
+.venv

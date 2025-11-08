@@ -18,3 +18,6 @@ class Questions(StatesGroup):
 class Admins(StatesGroup):
     edit_question = State()
     new_question = State()
+
+class UserLLM(StatesGroup):
+    answer = State()

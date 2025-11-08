@@ -1,8 +1,12 @@
+import asyncio
+import json
+
 import aiohttp
 import logging
 
-API_URL = "http://127.0.0.1:8000/api"
+from watchfiles import awatch
 
+API_URL = "http://127.0.0.1:8000/api"
 
 async def fetch_json(url: str, method: str = "GET", payload: dict | None = None):
     try:
@@ -15,6 +19,7 @@ async def fetch_json(url: str, method: str = "GET", payload: dict | None = None)
                 async with session.post(url, json=payload) as response:
                     response.raise_for_status()
                     return await response.json()
+
     except aiohttp.ClientResponseError as e:
         logging.error(f"MireyaApi error {e.status}: {e.message}")
     except Exception as e:
@@ -72,4 +77,24 @@ async def get_question_list(user_id: int):
     url = f"{API_URL}/{user_id}/get_question_list"
     return await fetch_json(url)
 
+async def generate_with_ollama(prompt: str) -> str:
+    url = "http://127.0.0.1:11434/api/generate"
+    payload = {"model": "gemma3:1b", "prompt": prompt}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                raise Exception(f"Ollama error {resp.status}: {text}")
+
+            response_text = ""
+            async for line in resp.content:
+                if line:
+                    try:
+                        data = json.loads(line.decode("utf-8"))
+                        if "response" in data:
+                            response_text += data["response"]
+                    except json.JSONDecodeError:
+                        continue
+            return response_text.strip()
 

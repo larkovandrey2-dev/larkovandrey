@@ -22,6 +22,7 @@ async def start(message: types.Message, state: FSMContext):
     else:
         keyboard = InlineKeyboardBuilder()
         keyboard.row(types.InlineKeyboardButton(text='Пройти опрос', callback_data='start_test'))
+        keyboard.row(types.InlineKeyboardButton(text='Поговорить', callback_data='start_llm_mode'))
         keyboard.row(types.InlineKeyboardButton(text='Личный кабинет', callback_data='personal_lk'))
         username = message.from_user.username
         if str(message.from_user.id) not in ADMINS:
