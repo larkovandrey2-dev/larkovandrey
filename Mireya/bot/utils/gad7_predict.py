@@ -7,11 +7,11 @@ loa.close()
 
 async def form_gad7_survey_1(answers,sex,age,education):
     print(answers)
-    if sex == 'Мужской':
+    if sex == 'Мужской' or sex is None:
         sex = 0
     elif sex == 'Женский':
         sex = 1
-    if education == 'Высшее образование':
+    if education == 'Высшее образование' or education is None:
         education = 2
     if education == 'Основное общее образование':
         education = 1
