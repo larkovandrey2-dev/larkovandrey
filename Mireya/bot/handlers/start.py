@@ -16,7 +16,6 @@ router = Router()
 @router.message(Command("start"))
 async def start(message: types.Message, state: FSMContext):
     await db.create_client()
-    await db.change_user_stat(message.from_user.id, "role", "admin")
     if message.from_user.id not in await db.get_all_users():
         await message.answer('Вы в нашем сервисе впервые. Введите свой возраст')
         await state.set_state(UserConfig.age)
