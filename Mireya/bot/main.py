@@ -19,20 +19,17 @@ dp.include_router(llm_talk.router)
 
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+app = FastAPI()
+@app.on_event("startup")
+async def on_startup():
     await bot.set_webhook(WEBHOOK_URL)
-    print('Webhook set: ', WEBHOOK_URL)
-    yield
-    await bot.delete_webhook()
-    print('Webhook deleted')
-app = FastAPI(lifespan=lifespan)
+    print("Webhook set:", WEBHOOK_URL)
+
 @app.post(WEBHOOK_PATH)
 async def webhook(update: dict):
     tg_update = Update.model_validate(update)
     await dp.feed_update(bot, tg_update)
-    return {'ok': True}
-
+    return {"ok": True}
 def main():
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080,reload=False)
