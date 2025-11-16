@@ -6,7 +6,7 @@ import logging
 
 from watchfiles import awatch
 
-API_URL = "http://127.0.0.1:8000/api"
+API_URL = "https://mireya-api.containerapps.ru/api"
 
 async def fetch_json(url: str, method: str = "GET", payload: dict | None = None):
     try:

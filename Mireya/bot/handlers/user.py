@@ -18,7 +18,7 @@ router = Router()
 @router.callback_query(F.data.startswith('personal_lk'))
 async def personal_lk(call: CallbackQuery):
     await db.create_client()
-    req = f"http://127.0.0.1:8000/api/get_user/{call.from_user.id}"
+    req = f"https://mireya-api.containerapps.ru/api/health/get_user/{call.from_user.id}"
 
     async with aiohttp.ClientSession() as session:
         data = await session.get(req)

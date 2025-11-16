@@ -6,9 +6,11 @@ services:
       context: .
       dockerfile: bot/Dockerfile
     container_name: mireya_bot
+    image: mireya.cr.cloud.ru/mireya-bot
     restart: unless-stopped
     ports:
       - "8000:8000"
+      - "5000:5000"
     env_file:
       - .env
     environment:
@@ -22,6 +24,8 @@ services:
       context: .
       dockerfile: api/Dockerfile
     container_name: mireya_api
+    image: mireya.cr.cloud.ru/mireya-api
+
     restart: unless-stopped
     ports:
       - "9000:9000"
