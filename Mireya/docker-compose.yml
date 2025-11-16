@@ -1,0 +1,31 @@
+version: "3.9"
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    container_name: mireya_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+      WEBHOOK_PATH: ${WEBHOOK_PATH}
+      ADMINS: ${ADMINS}
+      API_URL: http://mireya_api:8000/api
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: mireya_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      ADMINS: ${ADMINS}
