@@ -2,9 +2,7 @@ import io
 import datetime
 
 from supabase import acreate_client
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-import pandas as pd
 
 
 class DatabaseService:

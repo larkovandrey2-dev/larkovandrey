@@ -5,8 +5,8 @@ import aiohttp
 import logging
 
 from watchfiles import awatch
+from bot.config import API_URL
 
-API_URL = "http://127.0.0.1:8000/api"
 
 async def fetch_json(url: str, method: str = "GET", payload: dict | None = None):
     try:
