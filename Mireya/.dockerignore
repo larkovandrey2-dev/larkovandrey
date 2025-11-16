@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+.idea/
+.vscode/
+*.log
+*.tmp
+*.swp
+bot/__pycache__/
+bot/handlers/__pycache__/
+bot/services/__pycache__/
+api/__pycache__/
