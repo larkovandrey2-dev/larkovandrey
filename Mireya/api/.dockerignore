@@ -4,12 +4,10 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
 venv/
 env/
 *.env
 *.venv
-
 *.log
 Dockerfile
 .vscode/
