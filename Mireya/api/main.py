@@ -8,7 +8,7 @@ from fastapi import FastAPI, Body, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from bot.services.database import DatabaseService
+from services.database import DatabaseService
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
@@ -53,7 +53,7 @@ app = FastAPI(title="Mireya API", version="1.1", lifespan=lifespan)
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return "<h2>Hello Mireya</h2>"
+    return "<h2>Hello Shma</h2>"
 
 
 @app.get("/api/register_user/{user_id}")
