@@ -9,7 +9,6 @@ env/
 *.log
 *.tmp
 *.swp
-.git
 bot/__pycache__/
 bot/handlers/__pycache__/
 bot/services/__pycache__/
