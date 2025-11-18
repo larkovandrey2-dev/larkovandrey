@@ -11,4 +11,4 @@
 scripts.py
 .DS_Store
 .venv
-llm/llm
+llm_service/llm_service
