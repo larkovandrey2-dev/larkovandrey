@@ -12,3 +12,4 @@ scripts.py
 .DS_Store
 .venv
 llm_service/llm_service
+llm_service/.cache
