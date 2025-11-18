@@ -12,7 +12,8 @@ class UserConfig(StatesGroup):
 
 
 class Questions(StatesGroup):
-    questions = State()
+    questions1 = State()
+    questions2 = State()
 
 
 class Admins(StatesGroup):

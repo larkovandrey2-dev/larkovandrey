@@ -66,7 +66,7 @@ async def delete_question(call: CallbackQuery):
 @router.callback_query(F.data.startswith('admin_show_questions'))
 async def admin_show_questions_actions(call: CallbackQuery):
     await db.create_client()
-    if str(call.from_user.id) in ADMINS:
+    if call.from_user.id in ADMINS:
         questions = await db.all_questions()
         kb = await inline.create_edit_questions_kb(questions)
         await call.message.answer(
@@ -156,7 +156,7 @@ async def new_question(message: types.Message, state: FSMContext):
     await db.create_client()
     await db.add_question(quest_index, survey_index, quest_text)
     await state.clear()
-    await admin_command(message)
+    await admin_command(message,state)
 
 
 @router.message(Admins.edit_question)
@@ -166,4 +166,4 @@ async def commit_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
     await db.change_question(int(data['question_index']), int(data['survey_index']), edited_question)
     await message.answer('Успешно изменен вопрос')
-    await admin_command(message)
+    await admin_command(message,state)
