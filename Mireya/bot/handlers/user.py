@@ -41,12 +41,23 @@ async def personal_lk(call: CallbackQuery):
     builder.row(InlineKeyboardButton(text="Изменить возраст",callback_data="lk_change_age"))
     builder.row(InlineKeyboardButton(text="Изменить пол",callback_data="lk_change_sex"))
     builder.row(InlineKeyboardButton(text="Изменить образование",callback_data="lk_change_education"))
-    builder.row(InlineKeyboardButton(text="График твоей тревожности",callback_data="lk_anxiety_chart"))
+    builder.row(InlineKeyboardButton(text="График твоей тревожности",callback_data="lk_chart_chose"))
     await call.message.answer(text,parse_mode=ParseMode.MARKDOWN,reply_markup=builder.as_markup())
 
-@router.callback_query(F.data.startswith('lk_anxiety_chart'))
+@router.callback_query(F.data.startswith('lk_chart_chose'))
+async def choose_lk_chart(call: CallbackQuery):
+    await call.message.delete()
+    data = await db.get_surveys_results(call.from_user.id)
+    surveys_n = set([data[i]["survey_index"] for i in range(len(data))])
+    builder = InlineKeyboardBuilder()
+    for i in range(1,len(surveys_n)+1):
+        builder.row(InlineKeyboardButton(text=f'Опрос {i}',callback_data=f'lk_anxiety_chart_{i}'))
+    await call.message.answer('Выберите опрос, по которому хотите увидеть график своей тревожности',reply_markup=builder.as_markup())
+
+@router.callback_query(F.data.startswith('lk_anxiety_chart_'))
 async def lk_anxiety_chart(call: CallbackQuery):
-    img_buffer = await db.create_results_chart(call.from_user.id, 2)  # user_id: 10, survey_index: 1
+    survey_n = call.data.split('_')[3]
+    img_buffer = await db.create_results_chart(call.from_user.id, int(survey_n))  # user_id: 10, survey_index: 1
     if img_buffer:
         input_file = BufferedInputFile(
             file=img_buffer.getvalue(),

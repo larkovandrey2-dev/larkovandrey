@@ -202,7 +202,7 @@ class DatabaseService:
     async def get_surveys_results(self,user_id: int):
         try:
             response = await self.client.table('survey_results').select('*').eq('user_id', user_id).execute()
-            return response.data[0]
+            return response.data
         except Exception as e:
             print(f'Error in get_surveys_results: {e}')
 
