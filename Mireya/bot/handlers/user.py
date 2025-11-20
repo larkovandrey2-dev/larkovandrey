@@ -46,7 +46,7 @@ async def personal_lk(call: CallbackQuery):
 
 @router.callback_query(F.data.startswith('lk_anxiety_chart'))
 async def lk_anxiety_chart(call: CallbackQuery):
-    img_buffer = await db.create_results_chart(call.from_user.id, 1)  # user_id: 10, survey_index: 1
+    img_buffer = await db.create_results_chart(call.from_user.id, 2)  # user_id: 10, survey_index: 1
     if img_buffer:
         input_file = BufferedInputFile(
             file=img_buffer.getvalue(),

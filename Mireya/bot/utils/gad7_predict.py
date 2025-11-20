@@ -6,7 +6,6 @@ lr_ = pickle.load(loa)
 loa.close()
 
 async def form_gad7_survey_1(answers,sex,age,education):
-    print(answers)
     if sex == 'Мужской' or sex is None:
         sex = 0
     elif sex == 'Женский':
