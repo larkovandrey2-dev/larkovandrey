@@ -1,65 +1,89 @@
+# train_qwen_cpu.py
+import os
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, TrainingArguments, Trainer
 from peft import LoraConfig, get_peft_model
 import torch
 
-MODEL_NAME = "meta-llama/Llama-3.2-1b"  # маленькая, идёт даже на слабом ПК
+# --------------------------
+MODEL_NAME = "Qwen/Qwen2.5-1.5B"             # заменить на точное имя
+DATA_PATH = "dataset.jsonl"
+OUT_DIR = "./finetuned-qwen-cpu"
+EPOCHS = 2
+BATCH = 1
+GRAD_ACC = 8
+LR = 2e-4
+MAX_TOKENS = 512
+# --------------------------
 
-# Загружаем токенизатор
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+def main():
 
-# Загружаем модель в 4bit (экономия RAM)
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    load_in_4bit=True,
-    device_map="auto"
-)
+    device = "cpu"
+    print("Device:", device)
 
-# LoRA адаптер
-peft_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.05,
-    bias="none",
-    task_type="CAUSAL_LM",
-)
+    print("[1] Загружаю токенизатор...")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=False)
 
-model = get_peft_model(model, peft_config)
+    print("[2] Загружаю модель (float16 или float32)...")
 
-# Загружаем датасет
-dataset = load_dataset("json", data_files="dataset.jsonl", split="train")
-
-# Токенизация
-def encode(ex):
-    return tokenizer(
-        ex["prompt"] + ex["completion"],
-        truncation=True,
-        max_length=512,
+    # На CPU fp16 запрещён → используем float32
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        torch_dtype=torch.float32,
+        device_map={"": "cpu"}       # заставляем модель работать на CPU
     )
 
-tokenized = dataset.map(encode)
+    print("[3] Подключаю LoRA адаптер...")
 
-# Параметры обучения
-args = TrainingArguments(
-    output_dir="./finetuned-model",
-    num_train_epochs=3,
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=16,
-    learning_rate=2e-4,
-    logging_steps=10,
-    save_steps=200,
-)
+    peft_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.1,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
 
-# Trainer
-trainer = Trainer(
-    model=model,
-    args=args,
-    train_dataset=tokenized
-)
+    model = get_peft_model(model, peft_config)
 
-# Запуск обучения
-trainer.train()
+    print("[4] Загружаю датасет...")
+    dataset = load_dataset("json", data_files=DATA_PATH, split="train")
 
-# Сохранение итоговой модели
-trainer.save_model("./finetuned-model")
-tokenizer.save_pretrained("./finetuned-model")
+    def tokenize_fn(ex):
+        text = ex["prompt"] + ex["completion"]
+        return tokenizer(text, truncation=True, max_length=MAX_TOKENS)
+
+    tokenized = dataset.map(tokenize_fn, remove_columns=dataset.column_names)
+    tokenized.set_format(type="torch")
+
+    print("[5] Настраиваю обучение на CPU...")
+    args = TrainingArguments(
+        output_dir=OUT_DIR,
+        num_train_epochs=EPOCHS,
+        per_device_train_batch_size=BATCH,
+        gradient_accumulation_steps=GRAD_ACC,
+        learning_rate=LR,
+        logging_steps=10,
+        save_steps=200,
+        save_total_limit=3,
+        fp16=False,     # CPU запрет
+        bf16=False,     # CPU запрет
+        report_to="none",
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=tokenized
+    )
+
+    print("[6] Запускаю обучение...")
+    trainer.train()
+
+    print("[+] Сохраняю LoRA адаптер…")
+    model.save_pretrained(OUT_DIR)
+    tokenizer.save_pretrained(OUT_DIR)
+
+    print("Готово.")
+
+if __name__ == "__main__":
+    main()
