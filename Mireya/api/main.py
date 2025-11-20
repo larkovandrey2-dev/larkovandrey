@@ -4,11 +4,11 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI, Body, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-from bot.services.database import DatabaseService
+from helpers.database import DatabaseService
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
@@ -42,6 +42,12 @@ class QuestionIn(BaseModel):
     text: str
     global_n: int
     date: str
+class ResultIn(BaseModel):
+    user_id: int
+    global_n: int
+    survey_n: int
+    date: str
+    result: int
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,6 +84,28 @@ async def add_answer(data: AnswerIn):
         logging.error(f"Error in add_answer: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.post("/api/add_survey_result")
+async def add_survey_result(data: ResultIn):
+    """Новый POST добавления ответа."""
+    try:
+
+        await db.add_survey_result(data.user_id, data.global_n, data.survey_n, data.date, data.result)
+        user_stats = await db.get_user_stats(data.user_id)
+        surveys_user_c = user_stats['surveys_count']
+        results_list = user_stats['all_user_global_attempts']
+        if results_list is None:
+            results_list = []
+        results_list.append(data.global_n)
+        if surveys_user_c is None:
+            surveys_user_c = 0
+        await db.change_user_stat(data.user_id, 'last_survey_index', data.survey_n)
+        await db.change_user_stat(data.user_id, 'surveys_count', surveys_user_c + 1)
+        await db.change_user_stat(data.user_id, 'all_user_global_attempts', results_list)
+        return {"status": "ok"}
+    except Exception as e:
+        logging.error(f"Error in add_survey_result: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/get_user/{user_id}")
 async def get_user(user_id: int):
@@ -125,7 +153,8 @@ async def get_questions(survey_id: int):
         
         questions = await db.all_questions()
         filtered = [q for q in questions if q["survey_index"] == survey_id]
-        return {"data": filtered}
+        global_n = await get_global_number()
+        return {"data": filtered, "global_n": global_n}
     except Exception as e:
         logging.error(f"Error in get_questions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -154,7 +183,8 @@ async def get_question_list(user_id: int):
 
         selected = [q for q in questions if q["survey_index"] == survey_index]
         logging.info(f"User {user_id} got survey {survey_index}")
-        return selected
+        global_n = await get_global_number()
+        return {"questions": selected, "global_n": global_n}
     except Exception as e:
         logging.error(f"Error in get_question_list: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -163,3 +193,12 @@ async def get_question_list(user_id: int):
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+
+async def get_global_number():
+    global_surveys_n = list(set(await db.all_global_attempts()))
+    global_surveys_n.sort()
+    if not global_surveys_n:
+        global_surveys_n = [0]
+    new_global_number = global_surveys_n[-1] + 1
+    return new_global_number

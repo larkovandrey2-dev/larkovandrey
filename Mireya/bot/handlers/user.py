@@ -2,13 +2,12 @@ import os
 from aiogram import Router, types, F
 from aiogram.client.session import aiohttp
 from aiogram.enums import ParseMode
-from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.states import UserChanges
 from bot.config import API_URL
-from bot.services.database import DatabaseService
+from helpers.database import DatabaseService
 from aiogram.types import BufferedInputFile
 
 SUPABASE_URL = os.getenv('SUPABASE_URL')

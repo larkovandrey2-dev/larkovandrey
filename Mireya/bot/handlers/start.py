@@ -6,7 +6,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.config import ADMINS
 from bot.states import UserConfig
-from bot.services.database import DatabaseService
+from helpers.database import DatabaseService
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 db = DatabaseService(SUPABASE_URL, SUPABASE_SERVICE_KEY)

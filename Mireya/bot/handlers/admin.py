@@ -1,21 +1,16 @@
 import os
-from datetime import datetime
 
 from aiogram import Router, types, F
-from aiogram.client.session import aiohttp
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from watchfiles import awatch
+from aiogram.types import KeyboardButton, CallbackQuery
 
 from bot.config import ADMINS
-from bot.states import UserConfig, UserChanges, Questions, Admins
-from bot.services.database import DatabaseService
-from bot.utils import gad7_predict as gad7
+from bot.states import Admins
+from helpers.database import DatabaseService
 from bot.utils.kbs import inline
-import bot.services.api as api
+import helpers.api as api
 
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')

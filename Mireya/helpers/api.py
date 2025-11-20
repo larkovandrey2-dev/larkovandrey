@@ -53,6 +53,16 @@ async def add_answer(user_id: int, global_n: int, survey_n: int, question_n: int
         "date": date,
     }
     return await fetch_json(url, method="POST", payload=payload)
+async def add_survey_result(user_id: int, global_n: int, survey_n: int, date: str, result: int):
+    url = f"{API_URL}/add_survey_result"
+    payload = {
+        "user_id": user_id,
+        "global_n": global_n,
+        "survey_n": survey_n,
+        "result": result,
+        "date": date,
+    }
+    return await fetch_json(url, method="POST", payload=payload)
 
 
 async def add_question(user_id: int, survey_n: int, question_n: int, text: str, global_n: int, date: str):
@@ -77,24 +87,5 @@ async def get_question_list(user_id: int):
     url = f"{API_URL}/{user_id}/get_question_list"
     return await fetch_json(url)
 
-async def generate_with_ollama(prompt: str) -> str:
-    url = "http://127.0.0.1:11434/api/generate"
-    payload = {"model": "gemma3:1b", "prompt": prompt}
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload) as resp:
-            if resp.status != 200:
-                text = await resp.text()
-                raise Exception(f"Ollama error {resp.status}: {text}")
-
-            response_text = ""
-            async for line in resp.content:
-                if line:
-                    try:
-                        data = json.loads(line.decode("utf-8"))
-                        if "response" in data:
-                            response_text += data["response"]
-                    except json.JSONDecodeError:
-                        continue
-            return response_text.strip()
 
