@@ -2,7 +2,6 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for matplotlib and scikit-learn
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -10,20 +9,16 @@ RUN apt-get update && apt-get install -y \
     liblapack-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy all necessary modules
 COPY bot/ /app/bot/
 COPY helpers/ /app/helpers/
 COPY llm_service/ /app/llm_service/
 
-# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /app/bot/requirements.txt
 
-# Clean up
 RUN find /usr/local/lib/python3.11/site-packages -name 'tests' -type d -exec rm -rf {} + 2>/dev/null || true \
     && find /usr/local/lib/python3.11/site-packages -name 'docs' -type d -exec rm -rf {} + 2>/dev/null || true
 
-# Set Python path
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 

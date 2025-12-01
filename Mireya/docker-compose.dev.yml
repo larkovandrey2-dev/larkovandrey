@@ -1,7 +1,5 @@
 version: "3.9"
 
-# Development docker-compose with volume mounts for live code reloading
-# Usage: docker-compose -f docker-compose.dev.yml up
 
 services:
   api:
