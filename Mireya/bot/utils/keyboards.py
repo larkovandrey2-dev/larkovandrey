@@ -63,6 +63,9 @@ def build_main_menu() -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text="👤 Профиль", callback_data="personal_lk")
     )
+    builder.row(
+        InlineKeyboardButton(text="💚 Поддержка", callback_data="psycho_info")
+    )
     
     return builder.as_markup()
 

@@ -3,7 +3,7 @@ import os
 from aiogram import Router, types, F
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.states import UserChanges
@@ -213,3 +213,21 @@ async def lk_change_education_commit(message: types.Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="👤 Посмотреть профиль", callback_data="personal_lk"))
     await message.answer("Нажми, чтобы посмотреть обновлённый профиль:", reply_markup=builder.as_markup())
+
+@router.callback_query(F.data.startswith('psycho_info'))
+async def psycho_info(call: CallbackQuery, state: FSMContext):
+    info_text = """🧠 Психологическая помощь МАИ
+Бесплатная и конфиденциальная поддержка студентам при стрессе, тревоге, трудностях в учёбе и общении.
+Контакты:
+Грищук Е.А.
+📞 +7 977 166-84-00
+✉️ psiholog@mai.ru
+Лысакова А.Н.
+📞 +7 903 184-05-00
+Пчельникова О.Г.
+✉️ pchelnickova.olga@yandex.ru
+Курочка З.Р.
+📞 +7 985 536-80-80
+"""
+    await call.message.answer_photo(caption=info_text, parse_mode="HTML", reply_markup=build_back_button(),photo="https://mai.ru/upload/iblock/2fe/a9vdhnk3q8tvr7xbvi81klgbo2fw6cs2/Psikhologicheskaya-pomoshch.png")
+
