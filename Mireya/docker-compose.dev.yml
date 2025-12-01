@@ -1,11 +1,14 @@
 version: "3.9"
 
+# Development docker-compose with volume mounts for live code reloading
+# Usage: docker-compose -f docker-compose.dev.yml up
+
 services:
   api:
     build:
       context: .
       dockerfile: api/Dockerfile
-    container_name: mireya_api
+    container_name: mireya_api_dev
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -16,6 +19,11 @@ services:
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       YC_API_TOKEN: ${YC_API_TOKEN}
       ADMINS: ${ADMINS}
+    volumes:
+      - ./api:/app/api
+      - ./helpers:/app/helpers
+      - ./llm_service:/app/llm_service
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
@@ -29,7 +37,7 @@ services:
     build:
       context: .
       dockerfile: bot/Dockerfile
-    container_name: mireya_bot
+    container_name: mireya_bot_dev
     restart: unless-stopped
     depends_on:
       api:
@@ -45,9 +53,16 @@ services:
       API_URL: http://api:8000/api
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+    volumes:
+      - ./bot:/app/bot
+      - ./helpers:/app/helpers
+      - ./llm_service:/app/llm_service
+    command: python3 -m bot.main
     networks:
       - mireya_network
 
 networks:
   mireya_network:
     driver: bridge
+
+

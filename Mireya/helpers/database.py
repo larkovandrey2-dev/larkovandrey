@@ -1,17 +1,35 @@
 import io
 import datetime
-
+from typing import Optional
 from supabase import acreate_client
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
 class DatabaseService:
-    def __init__(self,supabase_url, supabase_key):
-        self.supabase_url = supabase_url
-        self.supabase_key = supabase_key
-        self.client = None
+    _instance: Optional['DatabaseService'] = None
+    _client = None
+    _initialized = False
+
+    def __new__(cls, supabase_url: str = None, supabase_key: str = None):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.supabase_url = supabase_url
+            cls._instance.supabase_key = supabase_key
+        return cls._instance
+
     async def create_client(self):
-        self.client = await acreate_client(self.supabase_url, self.supabase_key)
+        if self._client is None and not self._initialized:
+            self._client = await acreate_client(self.supabase_url, self.supabase_key)
+            self._initialized = True
+        return self._client
+
+    @property
+    def client(self):
+        if self._client is None:
+            raise RuntimeError("Database client not initialized. Call create_client() first.")
+        return self._client
 
     async def get_all_users(self) -> list:
         """returns a list with every user_id"""
@@ -181,21 +199,23 @@ class DatabaseService:
         except Exception as e:
             print(f'Error in delete_question: {e}')
 
-    async def add_survey_result(self,user_id: int, attempt_global_index: int, survey_index: int, date: str, result: int):
-        '''add a result for a single survey attempt'''
+    async def add_survey_result(
+        self,
+        user_id: int,
+        attempt_global_index: int,
+        survey_index: int,
+        date: str,
+        result: int,
+    ):
         try:
             new_response = {
                 'user_id': user_id,
                 'attempt_global_index': attempt_global_index,
                 'survey_index': survey_index,
                 'date': date,
-                'result': result
+                'result': result,
             }
-
-            if attempt_global_index in await self.all_global_attempts_results():
-                print(f'Global attempt with index {attempt_global_index} already exists')
-            else:
-                response = await self.client.table('survey_results').insert(new_response).execute()
+            await self.client.table('survey_results').insert(new_response).execute()
         except Exception as e:
             print(f'Error in add_survey_result: {e}')
 
@@ -206,60 +226,108 @@ class DatabaseService:
         except Exception as e:
             print(f'Error in get_surveys_results: {e}')
 
-    async def create_results_chart(self, user_id: int, survey_index: int, type='linear'):  # type can be 'linear', 'area' or 'bar'
-        '''creates a chart for all user's results in a given survey'''
+    async def get_next_global_number(self) -> int:
+        attempts = await self.all_global_attempts()
+        attempts.sort()
+        return attempts[-1] + 1 if attempts else 1
 
+    async def create_results_chart(
+        self,
+        user_id: int,
+        survey_index: int,
+        chart_type: str = 'linear'
+    ) -> Optional[io.BytesIO]:
+        """Create an in-memory chart for user's survey results for a given survey_index."""
         try:
-            response = await self.client.table('survey_results').select('*').eq('user_id', user_id).eq('survey_index',survey_index).execute()
-            print(response)
-            data_with_datetime = []
+            # Fetch all results for this user once, filter by survey_index in Python
+            response = await self.client.table('survey_results').select('*').eq('user_id', user_id).execute()
+            if not response.data:
+                return None
+
+            # Filter by requested survey_index with robust casting (string/int safe)
+            rows = []
             for item in response.data:
-                date_str = item['date']
+                raw_idx = item.get('survey_index')
+                if raw_idx is None:
+                    continue
+                if str(raw_idx) == str(survey_index):
+                    rows.append(item)
+
+            if not rows:
+                return None
+
+            # Deduplicate by attempt_global_index (one point per session)
+            seen_attempts = set()
+            data_points = []
+            for item in rows:
+                attempt_idx = item.get('attempt_global_index')
+                if attempt_idx in seen_attempts:
+                    continue
+                seen_attempts.add(attempt_idx)
+
+                date_str = item.get('date', '')
+                if not date_str:
+                    continue
+
+                dt_obj = None
+                # Prefer canonical format
                 try:
                     dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-                except Exception:
-                    print(f"Invalid date format: {date_str}")
+                except (ValueError, TypeError):
+                    # Fallback: try ISO format
+                    try:
+                        dt_obj = datetime.datetime.fromisoformat(date_str.replace('Z', '')[:19])
+                    except (ValueError, TypeError):
+                        dt_obj = None
+
+                if dt_obj is None:
                     continue
-                data_with_datetime.append({
-                    'date': date_str,
-                    'datetime': dt_obj,
-                    'result': item['result']
-                })
-            data_sorted = sorted(data_with_datetime, key=lambda x: x['datetime'])
-            if not data_sorted:
-                print('No data found')
-                return False
-            data_x = [elem['date'] for elem in data_sorted]
-            data_y = [elem['result'] for elem in data_sorted]
-            plt.figure()
-            if type == 'linear':
-                plt.plot(data_x, data_y)
-                plt.xlabel('Дата прохождения')
-                plt.ylabel('Уровень стресса')
-                plt.xticks(rotation=45)
-            elif type == 'area':
-                plt.fill_between(data_x, data_y, alpha=0.3, color='blue')
-                plt.plot(data_x, data_y, color='blue', alpha=0.8)
-                plt.xlabel('Дата прохождения')
-                plt.ylabel('Уровень стресса')
-                plt.xticks(rotation=45)
-            elif type == 'bar':
-                plt.bar(data_x, data_y, color='blue', alpha=0.5)
-                plt.xlabel('Дата прохождения')
-                plt.ylabel('Уровень стресса')
-                plt.xticks(rotation=45)
-            plt.title('Динамика уровня стресса')
-            plt.grid(True)
+
+                try:
+                    value = int(item['result'])
+                except (KeyError, TypeError, ValueError):
+                    continue
+
+                data_points.append({'datetime': dt_obj, 'result': value})
+
+            if not data_points:
+                return None
+
+            # Sort by time and build series
+            data_points.sort(key=lambda x: x['datetime'])
+            dates = [dp['datetime'] for dp in data_points]
+            results = [dp['result'] for dp in data_points]
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+
+            if chart_type == 'linear':
+                ax.plot(dates, results, marker='o', linewidth=2, markersize=6, color='#4A90E2')
+            elif chart_type == 'area':
+                ax.fill_between(dates, results, alpha=0.3, color='#4A90E2')
+                ax.plot(dates, results, marker='o', linewidth=2, markersize=6, color='#4A90E2')
+            elif chart_type == 'bar':
+                ax.bar(dates, results, alpha=0.6, color='#4A90E2', width=0.8)
+            else:
+                ax.plot(dates, results, marker='o', linewidth=2, markersize=6, color='#4A90E2')
+
+            ax.set_xlabel('Дата', fontsize=11)
+            ax.set_ylabel('Уровень тревожности (%)', fontsize=11)
+            ax.set_title('Динамика уровня тревожности', fontsize=13, fontweight='bold')
+            ax.grid(True, alpha=0.3)
+            plt.xticks(rotation=45, ha='right')
             plt.tight_layout()
+
             img_buffer = io.BytesIO()
-            plt.savefig(img_buffer, format='png')
+            plt.savefig(img_buffer, format='png', dpi=100, bbox_inches='tight')
             img_buffer.seek(0)
-            plt.close()
+            plt.close(fig)
 
             return img_buffer
 
         except Exception as e:
             print(f'Error in create_results_chart: {e}')
+            return None
+
 
 
 

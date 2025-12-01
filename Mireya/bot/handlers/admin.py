@@ -16,57 +16,106 @@ SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 db = DatabaseService(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 router = Router()
-@router.message(F.text == 'Назад 🛡️')
-@router.message(Command('admin'))
-async def admin_command(message: types.Message,state: FSMContext):
+@router.callback_query(F.data == "admin_menu")
+async def admin_menu_callback(call: CallbackQuery, state: FSMContext):
     await state.clear()
-    await db.create_client()
-    user_data = await db.get_user_stats(int(message.from_user.id))
-    user_role = user_data['role']
-    print(user_role)
+    await call.answer()
+    
+    user_data = await api.get_user(call.from_user.id)
+    if not user_data:
+        await call.message.answer('❌ Ошибка загрузки данных пользователя.')
+        return
+    
+    user_role = user_data.get('role', 'user')
     if "admin" in user_role:
         builder = await inline.create_admin_commands(user_role)
-        await message.answer('Доступ разрешен. Выберите действие: ', reply_markup=builder.as_markup())
+        await call.message.answer(
+            '🛡️ <b>Админ-панель</b>\n\nВыбери действие:',
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
     else:
-        await message.answer('Доступ запрещен.')
+        await call.answer('❌ Доступ запрещён.', show_alert=True)
+
+
+@router.message(F.text == 'Назад 🛡️')
+@router.message(Command('admin'))
+async def admin_command(message: types.Message, state: FSMContext):
+    await state.clear()
+    user_data = await api.get_user(message.from_user.id)
+    if not user_data:
+        await message.answer('❌ Ошибка загрузки данных пользователя.')
+        return
+    
+    user_role = user_data.get('role', 'user')
+    if "admin" in user_role:
+        builder = await inline.create_admin_commands(user_role)
+        await message.answer(
+            '🛡️ <b>Админ-панель</b>\n\nВыбери действие:',
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer('❌ Доступ запрещён.')
 
 
 @router.callback_query(F.data.startswith('admin_delete_questions'))
 async def admin_delete_questions_list(call: CallbackQuery):
-    await db.create_client()
-    questions = await db.all_questions()
+    await call.answer()
+    data = await api.get_all_questions()
+    if not data:
+        await call.message.answer("Ошибка загрузки вопросов.")
+        return
+    questions = data.get('questions') or data.get('data', [])
+    if not questions:
+        await call.message.answer("Вопросы не найдены.")
+        return
     kb = await inline.create_deletion_question_list(questions)
-    await call.message.answer('Выберите из списка вопрос, который хотите удалить:', reply_markup=kb.as_markup())
+    await call.message.answer('Выберите вопрос для удаления:', reply_markup=kb.as_markup())
 
 
 @router.callback_query(F.data.startswith('delete_question'))
 async def delete_question(call: CallbackQuery):
-    await db.create_client()
-    await call.message.delete()
+    await call.answer()
     data = call.data.split('_')
     survey_index = int(data[2])
     question_index = int(data[3])
-    await db.delete_question(question_index, survey_index)
+    
+    await api.delete_question(question_index, survey_index)
     response = await api.get_questions(survey_index)
-    if response:
-        first_question_index = int(response[0]['question_index'])
-        for i in range(1, len(response)):
-            await db.change_question_index(int(response[i]['question_index']),
-                                                         int(response[i]['survey_index']),
-                                                         first_question_index + i + 1)
-    await call.message.answer('Удаление успешно')
+    
+    if response and response.get('data'):
+        questions = response['data']
+        if questions:
+            first_question_index = int(questions[0]['question_index'])
+            for i in range(1, len(questions)):
+                await db.change_question_index(
+                    int(questions[i]['question_index']),
+                    int(questions[i]['survey_index']),
+                    first_question_index + i
+                )
+    
+    await call.message.answer('✅ Вопрос удалён')
     await admin_delete_questions_list(call)
 
 
 @router.callback_query(F.data.startswith('admin_show_questions'))
 async def admin_show_questions_actions(call: CallbackQuery):
-    await db.create_client()
+    await call.answer()
     if call.from_user.id in ADMINS:
-        questions = await db.all_questions()
+        data = await api.get_all_questions()
+        if not data:
+            await call.message.answer("Ошибка загрузки вопросов.")
+            return
+        questions = data.get('questions') or data.get('data', [])
+        if not questions:
+            await call.message.answer("Вопросы не найдены.")
+            return
         kb = await inline.create_edit_questions_kb(questions)
         await call.message.answer(
-            'Ниже представлена информация в виде: номер опроса || текст вопроса. Можете менять вопросы и создавать новые',
-            reply_markup=kb.as_markup())
+            'Список вопросов (номер опроса || текст вопроса):',
+            reply_markup=kb.as_markup()
+        )
 
 
 @router.callback_query(F.data.startswith('new_question'))
@@ -95,28 +144,50 @@ async def admin_user_find(call: CallbackQuery, state: FSMContext):
 async def admin_inspect_user(message: types.Message, state: FSMContext):
     await state.clear()
     kb = types.ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Назад 🛡️')]], resize_keyboard=True)
+    
     try:
-        if int(message.text) not in await db.get_all_users():
-            await message.answer("Пользователь с таким ID не зарегистрирован в боте. Попробуйте еще раз или нажмите на кнопку",reply_markup=kb)
-            return None
+        user_id = int(message.text)
+    except ValueError:
+        await message.answer("❌ Неверный формат ID. Введи число.", reply_markup=kb)
+        return
+    
+    try:
+        data = await api.get_all_users()
+        if not data:
+            await message.answer("Ошибка загрузки списка пользователей.", reply_markup=kb)
+            return
+        
+        users_list = data if isinstance(data, list) else data.get('users', [])
+        if user_id not in users_list:
+            await message.answer("❌ Пользователь с таким ID не найден.", reply_markup=kb)
+            return
     except Exception as e:
-        await message.answer("Неверный тип ввода. Попробуйте еще раз.", reply_markup=kb)
-    user_id = int(message.text)
-    user_data = await db.get_user_stats(user_id)
-    text = f'''*Профиль пользователя {user_id}*\n
-Пройдено опросов ✔️: {user_data['surveys_count']}\n
-Пол: {'👨' if user_data['sex'] == 'Мужской' else '👩'}\n
-Возраст: {user_data['age']}\n
-Образование 🎓: {user_data['education']}\n'''
-    if user_data['role'] == 'user':
-        text += 'Роль: пользователь'
-    elif user_data['role'] == 'admin':
-        text += 'Роль: администратор проекта'
-    elif user_data['role'] == 'survey_admin':
-        text += 'Роль: администратор опросов'
+        await message.answer(f"Ошибка: {e}", reply_markup=kb)
+        return
+    
+    user_data = await api.get_user(user_id)
+    if not user_data:
+        await message.answer("Ошибка загрузки данных пользователя.", reply_markup=kb)
+        return
+    
+    sex_emoji = '👨' if user_data.get('sex') == 'Мужской' else '👩'
+    role_text = {
+        'user': 'пользователь',
+        'admin': 'администратор проекта',
+        'survey_admin': 'администратор опросов'
+    }.get(user_data.get('role', 'user'), 'неизвестно')
+    
+    text = (
+        f"*Профиль пользователя {user_id}*\n\n"
+        f"Пройдено опросов: {user_data.get('surveys_count', 0)}\n"
+        f"{sex_emoji} Пол: {user_data.get('sex', 'Не указан')}\n"
+        f"Возраст: {user_data.get('age', 'Не указан')}\n"
+        f"Образование: {user_data.get('education', 'Не указано')}\n\n"
+        f"Роль: {role_text}"
+    )
+    
     kb = await inline.user_inspect_kb(user_id)
-    await message.answer(text, parse_mode=ParseMode.MARKDOWN,reply_markup=kb.as_markup())
-    return None
+    await message.answer(text, parse_mode=ParseMode.MARKDOWN, reply_markup=kb.as_markup())
 @router.callback_query(F.data.startswith('user_edit_role'))
 async def user_edit_role(call: CallbackQuery, state: FSMContext):
     await call.message.delete()
@@ -125,40 +196,64 @@ async def user_edit_role(call: CallbackQuery, state: FSMContext):
     await call.message.answer('Выберите роль',reply_markup=kb.as_markup())
 @router.callback_query(F.data.startswith('user_commit_role'))
 async def user_commit_role(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await call.message.delete()
-    user_id = call.data.split('_')[3]
-    role = call.data.split('_')[4]
+    data_parts = call.data.split('_')
+    user_id = int(data_parts[3])
+    role = data_parts[4]
+    
     if role == "adminsurvey":
-        await db.change_user_stat(int(user_id), "role", "survey_admin")
+        await db.change_user_stat(user_id, "role", "survey_admin")
+        role_display = "администратор опросов"
     else:
-        await db.change_user_stat(int(user_id), "role", role)
-    await call.message.answer(f"Успешно изменена роль {user_id} на '{role}'")
-    await admin_command(call.message,state)
+        await db.change_user_stat(user_id, "role", role)
+        role_display = role
+    
+    await call.message.answer(f"✅ Роль пользователя {user_id} изменена на '{role_display}'")
+    await admin_command(call.message, state)
 
 @router.message(Admins.new_question)
 async def new_question(message: types.Message, state: FSMContext):
-    msg = message.text.split('|')
-    survey_index = int(msg[0])
-    quest_text = msg[1]
-    quest_index = 1
     try:
-        response = await api.get_questions(survey_index)
-        if response['data']:
-            quest_index = response['data'][-1]['question_index'] + 1
-
-    except Exception as e:
-        print(e)
-    await db.create_client()
-    await db.add_question(quest_index, survey_index, quest_text)
-    await state.clear()
-    await admin_command(message,state)
+        parts = message.text.split('|')
+        if len(parts) < 2:
+            await message.answer("❌ Неверный формат. Используй: номер опроса | текст вопроса")
+            return
+        
+        survey_index = int(parts[0].strip())
+        quest_text = parts[1].strip()
+        quest_index = 1
+        
+        try:
+            response = await api.get_questions(survey_index)
+            if response and response.get('data'):
+                quest_index = response['data'][-1]['question_index'] + 1
+        except Exception as e:
+            print(f"Error getting questions: {e}")
+        
+        await db.create_client()
+        await db.add_question(quest_index, survey_index, quest_text)
+        await state.clear()
+        await message.answer(f"✅ Вопрос добавлен в опрос {survey_index}")
+        await admin_command(message, state)
+    except (ValueError, IndexError) as e:
+        await message.answer("❌ Ошибка формата. Используй: номер опроса | текст вопроса")
 
 
 @router.message(Admins.edit_question)
 async def commit_question(message: types.Message, state: FSMContext):
     await db.create_client()
-    edited_question = message.text
+    edited_question = message.text.strip()
     data = await state.get_data()
-    await db.change_question(int(data['question_index']), int(data['survey_index']), edited_question)
-    await message.answer('Успешно изменен вопрос')
-    await admin_command(message,state)
+    
+    question_index = int(data.get('question_index', 0))
+    survey_index = int(data.get('survey_index', 0))
+    
+    if not edited_question:
+        await message.answer("❌ Текст вопроса не может быть пустым.")
+        return
+    
+    await db.change_question(question_index, survey_index, edited_question)
+    await message.answer('✅ Вопрос успешно изменён')
+    await state.clear()
+    await admin_command(message, state)

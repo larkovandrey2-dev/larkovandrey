@@ -39,7 +39,12 @@ async def get_user(user_id: int):
 
 async def get_all_users():
     url = f"{API_URL}/show_all_users"
-    return await fetch_json(url)
+    result = await fetch_json(url)
+    if isinstance(result, list):
+        return result
+    elif isinstance(result, dict) and 'users' in result:
+        return result
+    return result
 
 
 async def add_answer(user_id: int, global_n: int, survey_n: int, question_n: int, text: str, date: str):
@@ -86,6 +91,31 @@ async def get_questions(survey_id: int):
 async def get_question_list(user_id: int):
     url = f"{API_URL}/{user_id}/get_question_list"
     return await fetch_json(url)
-
+async def get_all_questions():
+    url = f"{API_URL}/get_all_questions"
+    return await fetch_json(url)
+async def delete_question(question_index: int, survey_index: int):
+    url = f"{API_URL}/delete_question"
+    payload = {
+        "question_index": question_index,
+        "survey_index": survey_index
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+async def generate_llm(question: str, question_n: int, answer: str, last_json: dict, attempt: int = 0):
+    url = f"{API_URL}/generate"
+    payload = {
+        "question": question,
+        "question_n": question_n,
+        "answer": answer,
+        "last_json": last_json,
+        "attempt": attempt
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+async def rephrase_question(question: str):
+    url = f"{API_URL}/rephrase_question"
+    payload = {
+        "question": question,
+    }
+    return await fetch_json(url, method="POST", payload=payload)
 
 
