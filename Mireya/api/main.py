@@ -257,9 +257,9 @@ async def health_check():
 
 
 async def get_global_number():
-    global_surveys_n = list(set(await db.all_global_attempts()))
-    global_surveys_n.sort()
-    if not global_surveys_n:
-        global_surveys_n = [0]
-    new_global_number = global_surveys_n[-1] + 1
-    return new_global_number
+    try:
+        response = await db.client.rpc('get_next_global_index', {}).execute()
+        return response.data
+    except Exception as e:
+        logging.error(f"Error getting global number via RPC: {e}")
+        return int(datetime.utcnow().timestamp())

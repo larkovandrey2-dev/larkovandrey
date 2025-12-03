@@ -227,9 +227,8 @@ class DatabaseService:
             print(f'Error in get_surveys_results: {e}')
 
     async def get_next_global_number(self) -> int:
-        attempts = await self.all_global_attempts()
-        attempts.sort()
-        return attempts[-1] + 1 if attempts else 1
+        response = await self.client.rpc('get_next_global_index', {}).execute()
+        return response.data
 
     async def create_results_chart(
         self,
