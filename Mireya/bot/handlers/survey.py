@@ -15,6 +15,7 @@ from bot.utils.keyboards import (
     build_back_button
 )
 from bot.utils.messages import get_contextual_comment, get_progress_emoji
+from llm_service.interaction import get_final_recommendation
 
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
@@ -135,12 +136,15 @@ async def finish_test(message: types.Message, state: FSMContext, user_id = None)
         else:
             level_desc = "высокий"
             emoji = "🔴"
-        
+
+        recommendations = await get_final_recommendation(predicted_level)
         await message.answer(
-            f"📊 <b>Результаты опроса</b>\n\n"
+            f"📊 <b>Результаты анализа</b>\n\n"
             f"{emoji} Твой уровень тревожности: <b>{predicted_level}%</b>\n"
             f"Уровень: {level_desc}\n\n"
-            f"Этот результат поможет тебе лучше понять своё состояние.",
+            f"Мои рекомендации для тебя: \n\n"
+            f"{recommendations}\n"
+            f"<i>Помни: этот результат — лишь повод прислушаться к себе, а не диагноз.</i>",
             parse_mode="HTML",
             reply_markup=build_back_button()
         )

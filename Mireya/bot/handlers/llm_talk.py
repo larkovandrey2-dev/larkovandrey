@@ -10,6 +10,7 @@ from helpers.student_result import get_student_result
 from helpers.gad7_predict import form_gad7_survey_1, predict_stress_level
 from bot.utils.messages import get_processing_message
 from bot.utils.keyboards import build_back_button
+from llm_service.interaction import get_final_recommendation
 
 router = Router()
 
@@ -67,12 +68,14 @@ async def finish_test(message: types.Message, state: FSMContext):
         else:
             level_desc = "высокий"
             emoji = "🔴"
-        
+        recommendations = await get_final_recommendation(predicted_level)
         await message.answer(
             f"📊 <b>Результаты анализа</b>\n\n"
             f"{emoji} Твой уровень тревожности: <b>{predicted_level}%</b>\n"
             f"Уровень: {level_desc}\n\n"
-            f"Спасибо за честные ответы. Это поможет лучше понять твоё состояние.",
+            f"Мои рекомендации для тебя: \n\n"
+            f"{recommendations}\n"
+            f"<i>Помни: этот результат — лишь повод прислушаться к себе, а не диагноз.</i>",
             parse_mode="HTML",
             reply_markup=build_back_button()
         )
@@ -184,7 +187,20 @@ async def llm_talk_answer(message: types.Message, state: FSMContext):
         return
     
     llm_response = api_response['llm_response']
-    
+    if isinstance(llm_response, list) and llm_response[0] == -999:
+        await message.answer(
+            "🛑 <b>МЫ ОЧЕНЬ ЗА ТЕБЯ ПЕРЕЖИВАЕМ</b>\n\n"
+            "Похоже, ты сейчас в критическом состоянии. Я всего лишь бот и не могу помочь по-настоящему, "
+            "но есть люди, которые могут и хотят помочь прямо сейчас.\n\n"
+            "📞 <b>8 (800) 200-01-22</b> — Федеральный телефон доверия (Анонимно)\n"
+            "📞 <b>112</b> — Экстренная служба\n\n"
+            "Пожалуйста, не оставайся с этим в одиночестве. Позвони.",
+            parse_mode="HTML"
+        )
+        await state.clear()
+        return
+
+
     if isinstance(llm_response, list) and len(llm_response) == 2 and llm_response[0] == -1:
         follow_up_question = llm_response[1]
         await state.update_data(attempt=attempt + 1)

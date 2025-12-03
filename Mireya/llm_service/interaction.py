@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import os
+import re
 from typing import Optional, Dict, List, Union
 from dotenv import load_dotenv
 import hashlib
@@ -9,7 +10,9 @@ from llm_service.prompts import (
     get_follow_up_generation_prompt,
     get_follow_up_template,
     reset_follow_up_tracking,
-    get_rephrase_prompt
+    get_rephrase_prompt,
+    get_explain_prompt,
+    CRISIS_VERIFICATION_PROMPT
 )
 
 load_dotenv()
@@ -20,203 +23,258 @@ HEADERS = {
     "Authorization": f"Bearer {YC_API_TOKEN}",
     "Content-Type": "application/json"
 }
+CRISIS_KEYWORDS = [
+    "суицид", "самоубийств", "убить себя", "покончить с собой",
+    "не хочу жить", "жить не хочу", "смысла жить нет", "нет смысла жить",
+    "зачем я живу", "лучше бы я умер", "лучше бы я сдох",
+    "хочу умереть", "хочу сдохнуть", "мечтаю умереть",
 
-# In-memory cache for LLM responses
+    "вскрыться", "вскрыть вены", "порезать вены", "перерезать вены",
+    "выйти в окно", "шагнуть в окно", "прыгнуть с крыши", "спрыгнуть",
+    "шагнуть с карниза", "этаж", "высотка", "полет вниз",
+
+    "петля", "повеситься", "удавиться", "веревка и мыло", "лезть в петлю",
+    "наглотаться", "выпить таблетки", "пачка таблеток", "снотворное",
+    "под поезд", "под электричку", "рельсы", "метро",
+
+    "выпилиться", "самовыпил", "выпил",
+    "роскомнадзорнуться", "ркнуться",
+    "сделать роскомнадзор",
+    "откинуться", "рипнуться",
+    "уйти в афк", "ливнуть из жизни",
+    "ненавижу себя", "я ничтожество", "я обуза", "всем мешаю",
+    "без меня будет лучше", "исчезнуть навсегда", "заснуть и не проснуться",
+    "просто исчезнуть", "стереть себя", "конец всему"
+]
 _prompt_cache: Dict[str, str] = {}
 _cache_max_size = 200
-
-# Track last follow-up questions to avoid repetition
 _last_follow_ups: Dict[int, List[str]] = {}
 _max_tracked_follow_ups = 5
 
 
 def _get_cache_key(question: str, answer: str) -> str:
-    """Generate cache key for prompt."""
     return hashlib.md5(f"{question}:{answer}".encode()).hexdigest()
 
 
-async def _ask_model_async(
-    prompt: str,
-    temperature: float = 0.0,
-    max_tokens: int = 150,
-    timeout: int = 30
-) -> Optional[Dict]:
-    """Async call to Yandex GPT API with optimized settings."""
+async def _ask_model_async(prompt: str, temperature: float = 0.0, max_tokens: int = 150, timeout: int = 30) -> Optional[
+    Dict]:
     data = {
         "modelUri": MODEL_URI,
-        "completionOptions": {
-            "temperature": temperature,
-            "maxTokens": str(max_tokens)
-        },
-        "messages": [
-            {"role": "user", "text": prompt}
-        ]
+        "completionOptions": {"temperature": temperature, "maxTokens": str(max_tokens)},
+        "messages": [{"role": "user", "text": prompt}]
     }
-    
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-        "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
-        headers=HEADERS,
-                json=data,
-                timeout=aiohttp.ClientTimeout(total=timeout)
+                    "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
+                    headers=HEADERS, json=data, timeout=aiohttp.ClientTimeout(total=timeout)
             ) as response:
                 if response.status == 200:
                     return await response.json()
-                else:
-                    error_text = await response.text()
-                    print(f"LLM API error {response.status}: {error_text}")
-                    return None
-    except aiohttp.ClientError as e:
-        print(f"LLM API error: {e}")
+                return None
+    except Exception as e:
+        print(f"LLM Error: {e}")
+        return None
 
 
-async def diversify_question(question_text: str) -> str:
-    """
-    Takes an original question and returns a rephrased version
-    using LLM to make it sound more natural/varied.
-    """
-    if len(question_text) < 5:
-        return question_text
-    prompt = get_rephrase_prompt(question_text)
-    api_response = await _ask_model_async(prompt, temperature=0.8, max_tokens=150)
+async def explain_question_logic(question: str) -> str:
+    prompt = get_explain_prompt(question)
+    response = await _ask_model_async(prompt, temperature=0.6, max_tokens=150)
+    if response:
+        try:
+            return response['result']['alternatives'][0]['message']['text'].strip().replace('"', '')
+        except:
+            pass
+    return f"Я имел в виду: {question}. Попробуй ответить своими словами."
 
-    if not api_response:
-        return question_text
 
-    try:
-        new_text = api_response['result']['alternatives'][0]['message']['text'].strip()
-
-        if ":" in new_text[:20]:
-            new_text = new_text.split(":", 1)[1].strip()
-
-        new_text = new_text.replace('"', '').replace("«", "").replace("»", "")
-        if len(new_text) < 5:
-            return question_text
-
-        return new_text
-
-    except (KeyError, IndexError):
-        return question_text
 async def analyze_question(
-    question: str,
-    question_n: int,
-    answer: str,
-    last_json: Optional[Dict[int, int]] = None,
-    attempt: int = 0,
-    survey_n: int = 1
+        question: str,
+        question_n: int,
+        answer: str,
+        last_json: Optional[Dict[int, int]] = None,
+        attempt: int = 0,
+        survey_n: int = 1
 ) -> Union[Dict[int, int], List]:
-    """
-    Analyze user answer and return score or follow-up question.
-    Returns either updated last_json dict or [-1, follow_up_question].
-    Ensures follow-up questions never repeat.
-    """
-
     if last_json is None:
         last_json = {}
-    
-    # Get varied analysis prompt
+    potential_crisis = False
+    answer_lower = answer.lower()
+    for crisis_key in CRISIS_KEYWORDS:
+        if crisis_key in answer_lower:
+            potential_crisis = True
+            break
+
+    if potential_crisis:
+        check_prompt = CRISIS_VERIFICATION_PROMPT.format(answer=answer)
+
+        validation_response = await _ask_model_async(check_prompt, temperature=0.0, max_tokens=10)
+
+        if validation_response:
+            try:
+                verdict = validation_response['result']['alternatives'][0]['message']['text'].strip().upper()
+                if 'YES' in verdict:
+                    return [-999, "CRISIS"]
+            except:
+                pass  # Если ошибка проверки, лучше перестраховаться и пойти по обычному сценарию
+
+
+    skip_words = ['забей', 'пропусти', 'дальше', 'не хочу', 'ой все', 'хз', 'skip', 'next']
+    if any(s in answer.lower() for s in skip_words) and len(answer) < 20:
+        last_json[question_n] = 0
+        reset_follow_up_tracking(question_n)
+        return last_json
+
     prompt = get_analysis_prompt(question, answer, question_n, survey_n)
-    
-    # Check cache
+
     cache_key = _get_cache_key(question, answer)
     if cache_key in _prompt_cache:
         response_text = _prompt_cache[cache_key]
     else:
-        api_response = await _ask_model_async(prompt, temperature=0.0, max_tokens=50)
+        api_response = await _ask_model_async(prompt, temperature=0.1,
+                                              max_tokens=20)
         if not api_response:
             return last_json
-        
         try:
             response_text = api_response['result']['alternatives'][0]['message']['text'].strip()
-        except (KeyError, IndexError):
+        except:
             return last_json
-        
-        # Cache result
+
         if len(_prompt_cache) >= _cache_max_size:
-            # Clear 50% of cache
             keys_to_remove = list(_prompt_cache.keys())[:_cache_max_size // 2]
-            for key in keys_to_remove:
-                _prompt_cache.pop(key, None)
+            for key in keys_to_remove: _prompt_cache.pop(key, None)
         _prompt_cache[cache_key] = response_text
-    
-    # Parse response
-    if response_text == '-1' or not response_text.isdigit():
-        # Generate follow-up question with anti-repetition logic
-        follow_up_question = await _generate_unique_follow_up(
-            question, question_n, attempt
-        )
-        return [-1, follow_up_question]
-    
-    try:
-        score = int(response_text)
-        if 0 <= score <= 3:
-            last_json[question_n] = score
-            # Reset follow-up tracking when we get a valid answer
-            reset_follow_up_tracking(question_n)
-    except ValueError:
-        pass
-    
-    return last_json
+
+    response_text = response_text.replace('.', '').replace("'", "").strip()
 
 
-async def _generate_unique_follow_up(
-    original_question: str,
-    question_n: int,
-    attempt: int = 0
-) -> str:
-    """Generate a follow-up question that hasn't been used recently."""
-    # Initialize tracking for this question
+    if 'SKIP' in response_text:
+        last_json[question_n] = 0
+        reset_follow_up_tracking(question_n)
+        return last_json
+
+    if 'EXPLAIN' in response_text:
+        explanation = await explain_question_logic(question)
+        return [-1, explanation]
+
+    if response_text.isdigit():
+        try:
+            score = int(response_text)
+            valid = False
+            if survey_n == 1:
+                if question_n <= 8 and 0 <= score <= 3:
+                    valid = True
+                elif question_n in [9, 10] and 0 <= score <= 2:
+                    valid = True
+                elif question_n == 11:
+                    valid = True
+            else:
+                if 0 <= score <= 3: valid = True
+
+            if valid:
+                last_json[question_n] = score
+                reset_follow_up_tracking(question_n)
+                return last_json
+        except ValueError:
+            pass
+
+    follow_up_question = await _generate_unique_follow_up(question, question_n, attempt)
+    return [-1, follow_up_question]
+
+
+async def _generate_unique_follow_up(original_question: str, question_n: int, attempt: int = 0) -> str:
     if question_n not in _last_follow_ups:
         _last_follow_ups[question_n] = []
-    
     used = _last_follow_ups[question_n]
-    
-    # Try to generate via LLM first
+
     generation_prompt = get_follow_up_generation_prompt(original_question, attempt)
-    llm_response = await _ask_model_async(
-        generation_prompt,
-        temperature=0.4 + (attempt * 0.1),  # Increase creativity with attempts
-        max_tokens=120
-    )
-    
+    llm_response = await _ask_model_async(generation_prompt, temperature=0.5, max_tokens=100)
+
     if llm_response:
         try:
             follow_up_text = llm_response['result']['alternatives'][0]['message']['text'].strip()
-            # Clean up response
             follow_up_text = follow_up_text.strip('"\'«»').split('\n')[0].strip()
-            
-            # Check if we've used this before
-            if follow_up_text not in used:
-                # Track it
+            if follow_up_text not in used and len(follow_up_text) > 10:
                 used.append(follow_up_text)
-                if len(used) > _max_tracked_follow_ups:
-                    used.pop(0)
-                
-                # Ensure length
-                if len(follow_up_text) > 100:
-                    follow_up_text = follow_up_text[:97] + "..."
-                elif len(follow_up_text) < 30:
-                    # Too short, use template
-                    pass
-                else:
-                    return follow_up_text
-        except (KeyError, IndexError):
+                if len(used) > _max_tracked_follow_ups: used.pop(0)
+                return follow_up_text
+        except:
             pass
-    
-    # Fallback to template system with anti-repetition
-    max_attempts = 10
-    for _ in range(max_attempts):
+
+    for _ in range(10):
         template_text = get_follow_up_template(original_question, question_n, attempt)
-        
-        # Check if we've used this exact text
         if template_text not in used:
             used.append(template_text)
-            if len(used) > _max_tracked_follow_ups:
-                used.pop(0)
+            if len(used) > _max_tracked_follow_ups: used.pop(0)
             return template_text
-        
         attempt += 1
-    
-    # Last resort: return template even if used (shouldn't happen)
     return get_follow_up_template(original_question, question_n, attempt)
+
+
+
+
+
+async def diversify_question(question_text: str) -> str:
+    if len(question_text) < 5:
+        return question_text
+    clean_text = re.sub(r'\(.*?\d.*?\)', '', question_text)
+    clean_text = clean_text.replace("от 0 до 3", "").replace("0 - совсем нет", "").replace("3 - очень часто", "")
+    clean_text = clean_text.replace("Оцени", "").replace("оцени", "")
+    clean_text = " ".join(clean_text.split())
+    if len(clean_text) < 5:
+        clean_text = question_text
+
+    prompt = get_rephrase_prompt(clean_text)
+    api_response = await _ask_model_async(prompt, temperature=0.7, max_tokens=200)
+
+    if not api_response:
+        return clean_text
+
+    try:
+        new_text = api_response['result']['alternatives'][0]['message']['text'].strip()
+
+        if ":" in new_text[:10]:
+            new_text = new_text.split(":", 1)[1].strip()
+
+        new_text = new_text.replace('"', '').replace("«", "").replace("»", "")
+
+        if '0' in new_text and '3' in new_text:
+            return clean_text
+
+        if len(new_text) < 5:
+            return clean_text
+
+        return new_text
+
+    except (KeyError, IndexError):
+        return clean_text
+
+
+async def get_final_recommendation(score_percent: int) -> str:
+    level_desc = "низкий"
+    if score_percent > 30: level_desc = "средний"
+    if score_percent > 70: level_desc = "высокий"
+
+    prompt = (
+        f"У студента уровень тревожности {score_percent}% ({level_desc}). "
+        "Дай 3 очень кратких, конкретных совета (по 1 предложению), что сделать прямо сейчас, "
+        "чтобы почувствовать себя лучше. Будь эмпатичным другом. "
+        "Не советуй идти к врачу (это очевидно), дай бытовые техники (дыхание, прогулка, сон)."
+        "Формат:\n1. ...\n2. ...\n3. ..."
+    )
+
+    response = await _ask_model_async(prompt, temperature=0.6, max_tokens=200)
+
+    default_text = (
+        "1. Попробуй практику глубокого дыхания: вдох на 4 счета, выдох на 6.\n"
+        "2. Сделай небольшую паузу и выпей стакан воды.\n"
+        "3. Если есть возможность, прогуляйся 10 минут на свежем воздухе."
+    )
+
+    if response:
+        try:
+            text = response['result']['alternatives'][0]['message']['text'].strip()
+            return text.replace('"', '')
+        except:
+            return default_text
+    return default_text

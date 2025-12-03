@@ -8,7 +8,6 @@ loa.close()
 
 
 async def form_gad7_survey_1(answers, sex, age, education):
-    """Form GAD-7 survey data. Handles missing optional answers gracefully."""
     if sex == 'Мужской' or sex is None:
         sex = 0
     elif sex == 'Женский':
@@ -89,15 +88,25 @@ async def form_gad7_survey_1(answers, sex, age, education):
 
 
 async def predict_stress_level(gad_form: dict):
-    """Predict stress level from GAD-7 form data."""
     if not gad_form or gad_form == {}:
         return -1
-    
     try:
         gad_table = pandas.DataFrame.from_dict(gad_form)
-        predicted_level = lr_.predict(gad_table)
-        level_in_percents = (predicted_level[0] * 100) / 21
-        return int(level_in_percents)
+        predicted_raw = lr_.predict(gad_table)[0]
+        predicted_score = max(0, min(21, predicted_raw))
+        level_in_percents = (predicted_score * 100) / 21
+        val_gad1 = gad_form.get('GAD1', [0])[0]
+        val_gad2 = gad_form.get('GAD2', [0])[0]
+        val_gad7 = gad_form.get('GAD7', [0])[0]
+        risk_factor = 1.0
+        if val_gad1 >= 3 or val_gad2 >= 3:
+            risk_factor += 0.15
+        if val_gad7 >= 2:
+            risk_factor += 0.10
+        final_level = level_in_percents * risk_factor
+        final_level = min(100, final_level)
+        return int(final_level)
+
     except Exception as e:
         print(f"Error in predict_stress_level: {e}")
         import traceback
