@@ -13,3 +13,4 @@ scripts.py
 .venv
 llm_service/llm_service
 llm_service/.cache
+*/__pycache__/
