@@ -1,0 +1,121 @@
+import asyncio
+import json
+
+import aiohttp
+import logging
+
+from watchfiles import awatch
+from bot.config import API_URL
+
+
+async def fetch_json(url: str, method: str = "GET", payload: dict | None = None):
+    try:
+        async with aiohttp.ClientSession() as session:
+            if method == "GET":
+                async with session.get(url) as response:
+                    response.raise_for_status()
+                    return await response.json()
+            elif method == "POST":
+                async with session.post(url, json=payload) as response:
+                    response.raise_for_status()
+                    return await response.json()
+
+    except aiohttp.ClientResponseError as e:
+        logging.error(f"MireyaApi error {e.status}: {e.message}")
+    except Exception as e:
+        logging.error(f"Request failed: {e}")
+    return None
+
+
+async def register_user(user_id: int):
+    url = f"{API_URL}/register_user/{user_id}"
+    return await fetch_json(url)
+
+
+async def get_user(user_id: int):
+    url = f"{API_URL}/get_user/{user_id}"
+    return await fetch_json(url)
+
+
+async def get_all_users():
+    url = f"{API_URL}/show_all_users"
+    result = await fetch_json(url)
+    if isinstance(result, list):
+        return result
+    elif isinstance(result, dict) and 'users' in result:
+        return result
+    return result
+
+
+async def add_answer(user_id: int, global_n: int, survey_n: int, question_n: int, text: str, date: str):
+    url = f"{API_URL}/add_answer"
+    payload = {
+        "user_id": user_id,
+        "global_n": global_n,
+        "survey_n": survey_n,
+        "question_n": question_n,
+        "text": text,
+        "date": date,
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+async def add_survey_result(user_id: int, global_n: int, survey_n: int, date: str, result: int):
+    url = f"{API_URL}/add_survey_result"
+    payload = {
+        "user_id": user_id,
+        "global_n": global_n,
+        "survey_n": survey_n,
+        "result": result,
+        "date": date,
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+
+
+async def add_question(user_id: int, survey_n: int, question_n: int, text: str, global_n: int, date: str):
+    url = f"{API_URL}/add_question"
+    payload = {
+        "user_id": user_id,
+        "survey_n": survey_n,
+        "question_n": question_n,
+        "text": text,
+        "global_n": global_n,
+        "date": date,
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+
+
+async def get_questions(survey_id: int):
+    url = f"{API_URL}/get_questions/{survey_id}"
+    return await fetch_json(url)
+
+
+async def get_question_list(user_id: int):
+    url = f"{API_URL}/{user_id}/get_question_list"
+    return await fetch_json(url)
+async def get_all_questions():
+    url = f"{API_URL}/get_all_questions"
+    return await fetch_json(url)
+async def delete_question(question_index: int, survey_index: int):
+    url = f"{API_URL}/delete_question"
+    payload = {
+        "question_index": question_index,
+        "survey_index": survey_index
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+async def generate_llm(question: str, question_n: int, answer: str, last_json: dict, attempt: int = 0):
+    url = f"{API_URL}/generate"
+    payload = {
+        "question": question,
+        "question_n": question_n,
+        "answer": answer,
+        "last_json": last_json,
+        "attempt": attempt
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+async def rephrase_question(question: str):
+    url = f"{API_URL}/rephrase_question"
+    payload = {
+        "question": question,
+    }
+    return await fetch_json(url, method="POST", payload=payload)
+
+
