@@ -40,8 +40,6 @@ services:
       - .env
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
-      WEBHOOK_URL: ${WEBHOOK_URL}
-      WEBHOOK_PATH: ${WEBHOOK_PATH}
       ADMINS: ${ADMINS}
       YC_API_TOKEN: ${YC_API_TOKEN}
       API_URL: http://api:8000/api
