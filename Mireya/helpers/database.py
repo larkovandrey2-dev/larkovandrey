@@ -255,7 +255,6 @@ class DatabaseService:
             if not rows:
                 return None
 
-            # Deduplicate by attempt_global_index (one point per session)
             seen_attempts = set()
             data_points = []
             for item in rows:
@@ -269,11 +268,9 @@ class DatabaseService:
                     continue
 
                 dt_obj = None
-                # Prefer canonical format
                 try:
                     dt_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
                 except (ValueError, TypeError):
-                    # Fallback: try ISO format
                     try:
                         dt_obj = datetime.datetime.fromisoformat(date_str.replace('Z', '')[:19])
                     except (ValueError, TypeError):
@@ -292,7 +289,6 @@ class DatabaseService:
             if not data_points:
                 return None
 
-            # Sort by time and build series
             data_points.sort(key=lambda x: x['datetime'])
             dates = [dp['datetime'] for dp in data_points]
             results = [dp['result'] for dp in data_points]
