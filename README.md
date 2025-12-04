@@ -69,7 +69,7 @@ git https://github.com/larkovandrey2-dev/larkovandrey.git
 cd Mireya
 ```
 ### 2. Настройка окружения
-Создайте файл .env и заполните его своими данными:
+Создайте файл .env в папке Mireya и заполните его своими данными:
 
 
 ``` Env 
