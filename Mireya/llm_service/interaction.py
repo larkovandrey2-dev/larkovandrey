@@ -125,6 +125,12 @@ async def analyze_question(
             except:
                 pass
 
+    frustration_words = ['я же сказал', 'я сказал', 'уже ответил', 'повторяю', 'читай выше', 'выше написано']
+    if any(fw in answer_lower for fw in frustration_words):
+        last_json[question_n] = 3
+        reset_follow_up_tracking(question_n)
+        return last_json
+
 
     skip_words = ['забей', 'пропусти', 'дальше', 'не хочу', 'ой все', 'хз', 'skip', 'next']
     if any(s in answer.lower() for s in skip_words) and len(answer) < 20:
