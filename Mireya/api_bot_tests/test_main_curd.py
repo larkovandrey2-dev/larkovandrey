@@ -37,11 +37,6 @@ except ImportError:
     DB_PATCH_PATH = "api.main.db"
     app_module_path = "api.main"
 
-
-# ==================================================================================
-# 2. ТЕСТЫ API (CRUD ОПЕРАЦИИ)
-# ==================================================================================
-
 class TestMireyaCRUD(unittest.TestCase):
 
     def setUp(self):
