@@ -15,7 +15,6 @@ os.environ["SUPABASE_URL"] = "https://example.com"
 os.environ["SUPABASE_SERVICE_KEY"] = "fake_key"
 os.environ["ADMINS"] = "123"
 
-# Подменяем модули
 mock_db_module = MagicMock()
 mock_db_service = MagicMock()
 mock_db_module.DatabaseService = mock_db_service
@@ -23,17 +22,14 @@ sys.modules["helpers.database"] = mock_db_module
 sys.modules["llm_service"] = MagicMock()
 sys.modules["llm_service.interaction"] = MagicMock()
 
-# Импортируем приложение и определяем пути для патчей
 try:
     from main import app
 
-    # Если импорт сработал, значит main в корне
     DB_PATCH_PATH = "main.db"
     app_module_path = "main"
 except ImportError:
     from api.main import app
 
-    # Если импорт сработал тут, значит main в папке api
     DB_PATCH_PATH = "api.main.db"
     app_module_path = "api.main"
 
@@ -162,3 +158,20 @@ class TestMireyaCRUD(unittest.TestCase):
             {"survey_index": 1, "text": "Q1"},
             {"survey_index": 2, "text": "Q2"}
         ]
+
+        # Теперь app_module_path определен корректно
+        with patch(f"{DB_PATCH_PATH}.all_questions", new_callable=AsyncMock) as mock_all, \
+                patch(f"{app_module_path}.get_global_number", new_callable=AsyncMock) as mock_glob:
+            mock_all.return_value = fake_questions
+            mock_glob.return_value = 123
+
+            response = self.client.get(f"/api/get_questions/{survey_id}")
+
+            data = response.json()
+            self.assertEqual(data["global_n"], 123)
+            self.assertEqual(len(data["data"]), 1)
+            self.assertEqual(data["data"][0]["text"], "Q1")
+
+
+if __name__ == '__main__':
+    unittest.main()
