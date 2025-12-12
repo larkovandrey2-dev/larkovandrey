@@ -162,5 +162,3 @@ class TestMireyaCRUD(unittest.TestCase):
             {"survey_index": 1, "text": "Q1"},
             {"survey_index": 2, "text": "Q2"}
         ]
-
-        # Теперь app_
