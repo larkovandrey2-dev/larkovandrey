@@ -1,0 +1,98 @@
+[
+  {
+    "name": "Normal Answer (Low Score)",
+    "input": {
+      "question": "Как ты спишь?",
+      "question_n": 1,
+      "answer": "Сплю отлично, 8 часов",
+      "last_json": {},
+      "attempt": 0
+    },
+    "mock_llm_return": {"1": 0},
+    "expected_status": 200,
+    "expected_response": {
+      "status": "ok",
+      "llm_response": {"1": 0}
+    }
+  },
+  {
+    "name": "Normal Answer (High Score)",
+    "input": {
+      "question": "Чувствуешь тревогу?",
+      "question_n": 2,
+      "answer": "Да, постоянно трясет",
+      "last_json": {"1": 0},
+      "attempt": 0
+    },
+    "mock_llm_return": {"2": 3},
+    "expected_status": 200,
+    "expected_response": {
+      "status": "ok",
+      "llm_response": {"2": 3}
+    }
+  },
+  {
+    "name": "Crisis Response",
+    "input": {
+      "question": "Как настроение?",
+      "question_n": 3,
+      "answer": "Жить не хочу",
+      "last_json": {"1": 0, "2": 3},
+      "attempt": 0
+    },
+    "mock_llm_return": [-999, "CRISIS"],
+    "expected_status": 200,
+    "expected_response": {
+      "status": "ok",
+      "llm_response": [-999, "CRISIS"]
+    }
+  },
+  {
+    "name": "Clarification Needed",
+    "input": {
+      "question": "Ты раздражителен?",
+      "question_n": 4,
+      "answer": "Ну такое...",
+      "last_json": {},
+      "attempt": 0
+    },
+    "mock_llm_return": [-1, "Что именно вы имеете в виду?"],
+    "expected_status": 200,
+    "expected_response": {
+      "status": "ok",
+      "llm_response": [-1, "Что именно вы имеете в виду?"]
+    }
+  },
+  {
+    "name": "Skip Question",
+    "input": {
+      "question": "Расскажи подробнее",
+      "question_n": 5,
+      "answer": "Пропустить",
+      "last_json": {},
+      "attempt": 0
+    },
+    "mock_llm_return": {"5": 0},
+    "expected_status": 200,
+    "expected_response": {
+      "status": "ok",
+      "llm_response": {"5": 0}
+    }
+  },
+  {
+    "name": "Explanation Request",
+    "input": {
+      "question": "Оцените шкалу",
+      "question_n": 6,
+      "answer": "Я не понимаю вопрос",
+      "last_json": {},
+      "attempt": 0
+    },
+    "mock_llm_return": [-1, "Я имел в виду, часто ли это происходит?"],
+    "expected_status": 200,
+    "expected_response": {
+      "status": "ok",
+      "llm_response": [-1, "Я имел в виду, часто ли это происходит?"]
+    }
+  }
+]
